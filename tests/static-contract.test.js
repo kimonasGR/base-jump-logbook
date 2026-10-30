@@ -84,7 +84,8 @@ test('cloud restore retains local-only media for matching jump IDs', () => {
 
 test('settings accurately disclose local-only media and current voice limitations', () => {
   assert.match(ui, /Photos, videos and FlySight files are currently stored only on this device/);
-  assert.match(ui, /Records audio and sends it to the private AI extraction endpoint/);\n  assert.match(ui, /Nothing is saved until you review and submit the jump/);
+  assert.match(ui, /Records audio and sends it to the private AI extraction endpoint/);
+  assert.match(ui, /Nothing is saved until you review and submit the jump/);
 });
 
 test('AI voice draft is wired to the authenticated extraction endpoint', () => {
