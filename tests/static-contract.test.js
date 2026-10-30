@@ -221,9 +221,6 @@ test('FlySight import accepts TRACK and SENSOR files together', () => {
   assert.match(ui, /trackDraft\.sensorData\?'<div class=/);
   assert.match(ui, /Sensor files imported:/);
 });
-  assert.match(ui, /\['GNSS','GPS','TRACK'\]/);
-  assert.match(ui, /function splitCsvLine\(line\)/);
-});
 
 test('FlySight import reverse-geocodes GPS coordinates into country field', () => {
   assert.match(ui, /api\/geocode\/reverse\?lat=/);
