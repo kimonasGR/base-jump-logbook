@@ -157,3 +157,9 @@ test('FlySight import estimates deployment delay and altitude loss for review', 
   assert.match(ui, /Apply estimated opening delay and altitude loss/);
   assert.match(ui, /confidence/);
 });
+
+test('FlySight time parser supports elapsed seconds and absolute timestamps', () => {
+  assert.match(ui, /function trackTimeMs\(value\)/);
+  assert.match(ui, /const ts=trackTimeMs\(p\.time\)/);
+  assert.match(ui, /times=points\.map\(p=>trackTimeMs\(p\.time\)\)/);
+});
