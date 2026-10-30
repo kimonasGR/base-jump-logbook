@@ -148,7 +148,12 @@ test('FlySight importer parses GPX and CSV into bounded GPS track points', () =>
   assert.match(ui, /Track points and flight statistics are saved with this jump/);
 });
 
-test('FlySight route preview is rendered from bounded GPS coordinates', () => {\n  assert.match(ui, /function trackPreviewHtml\(t\)/);\n  assert.match(ui, /aria-label=\"Imported FlySight GPS track\"/);\n  assert.match(ui, /trackPreviewHtml\(trackDraft\)/);\n});\n
+test('FlySight route preview is rendered from bounded GPS coordinates', () => {
+  assert.match(ui, /function trackPreviewHtml\(t\)/);
+  assert.match(ui, /aria-label="Imported FlySight GPS track"/);
+  assert.match(ui, /trackPreviewHtml\(trackDraft\)/);
+});
+
 test('FlySight import estimates deployment delay and altitude loss for review', () => {
   assert.match(ui, /velD=find\(\['veld','down velocity','vertical velocity'\]\)/);
   assert.match(ui, /function detectDeployment\(points\)/);
