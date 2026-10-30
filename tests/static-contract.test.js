@@ -135,3 +135,13 @@ test('local data is backed up before a cloud restore can replace it', () => {
   assert.match(ui, /if\(!confirm\('A cloud logbook already exists/);
   assert.match(ui, /id="exportRecovery"/);
 });
+
+test('FlySight importer parses GPX and CSV into bounded GPS track points', () => {
+  assert.match(ui, /function parseFlySightCsv\(raw\)/);
+  assert.match(ui, /function parseFlySightGpx\(raw\)/);
+  assert.match(ui, /function summarizeTrack\(points\)/);
+  assert.match(ui, /points\.length>=10000/);
+  assert.match(ui, /f\.size>15\*1024\*1024/);
+  assert.match(ui, /flysightTrack:trackDraft/);
+  assert.match(ui, /Track points and flight statistics are saved with this jump/);
+});
