@@ -73,7 +73,7 @@ test('objects are created through jump saves, never manually', () => {
 });
 
 test('cloud conflict cancellation never uploads local data over the cloud copy', () => {
-  assert.match(ui, /if\(localHasData&&!confirm\([\s\S]*?throw Error\('Cloud data was not loaded/);
+  assert.match(ui, /backupTime=window\.createLocalRecoveryBackup\(\)/);\n  assert.match(ui, /if\(!confirm\('A cloud logbook already exists/);\n  assert.match(ui, /Your local records remain unchanged/);
   assert.doesNotMatch(ui, /gate\.style\.display='none';cloudReady=true;await syncCloud\(\);return/);
 });
 
@@ -83,7 +83,7 @@ test('cloud restore retains local-only media for matching jump IDs', () => {
 });
 
 test('settings accurately disclose local-only media and current voice limitations', () => {
-  assert.match(ui, /Photos, videos and FlySight files are currently stored only on this device/);
+  assert.match(ui, /Photos and videos are currently stored only on this device\. FlySight GPS track data syncs/);
   assert.match(ui, /Records audio and sends it to the private AI extraction endpoint/);
   assert.match(ui, /nothing is saved until you review and submit the jump/);
 });
@@ -145,3 +145,5 @@ test('FlySight importer parses GPX and CSV into bounded GPS track points', () =>
   assert.match(ui, /flysightTrack:trackDraft/);
   assert.match(ui, /Track points and flight statistics are saved with this jump/);
 });
+
+test('FlySight route preview is rendered from bounded GPS coordinates', () => {\n  assert.match(ui, /function trackPreviewHtml\(t\)/);\n  assert.match(ui, /aria-label=\"Imported FlySight GPS track\"/);\n  assert.match(ui, /trackPreviewHtml\(trackDraft\)/);\n});\n
