@@ -4,6 +4,7 @@ struct FlySightConnectionView: View {
     @StateObject private var bluetooth = FlySightBLEClient()
     @State private var files: [FlySightBLEClient.FlySightFile] = []
     @State private var downloadedFiles: [URL] = []
+    @State private var selectedForImport: Set<String> = []
     @State private var isListing = false
     @State private var downloadingName: String?
     @State private var transferSaveError: String?
@@ -103,12 +104,32 @@ struct FlySightConnectionView: View {
                 }
 
                 if !downloadedFiles.isEmpty {
-                    Section("Saved on this iPhone") {
+                    Section("Ready to import into your logbook") {
+                        Text("Select TRACK.CSV and SENSOR.CSV together. Share the selected files, then choose the BASE Logbook web app's import screen and select both files in one operation.")
+                            .font(.footnote).foregroundStyle(.secondary)
                         ForEach(downloadedFiles, id: \.absoluteString) { url in
-                            ShareLink(item: url) {
-                                Label(url.lastPathComponent, systemImage: "square.and.arrow.up")
+                            Toggle(isOn: Binding(
+                                get: { selectedForImport.contains(url.absoluteString) },
+                                set: { selected in
+                                    if selected { selectedForImport.insert(url.absoluteString) }
+                                    else { selectedForImport.remove(url.absoluteString) }
+                                }
+                            )) {
+                                Label(url.lastPathComponent, systemImage: "doc.text")
                             }
                         }
+                        ShareLink(items: downloadedFiles.filter { selectedForImport.contains($0.absoluteString) }) {
+                            Label("Share selected files together", systemImage: "square.and.arrow.up")
+                        }
+                        .disabled(selectedForImport.isEmpty)
+                        Button("Select TRACK.CSV + SENSOR.CSV") {
+                            selectedForImport = Set(downloadedFiles.filter {
+                                let name = $0.lastPathComponent.uppercased()
+                                return name == "TRACK.CSV" || name == "SENSOR.CSV"
+                            }.map(\.absoluteString))
+                        }
+                        .disabled(!downloadedFiles.contains { $0.lastPathComponent.uppercased() == "TRACK.CSV" } ||
+                                  !downloadedFiles.contains { $0.lastPathComponent.uppercased() == "SENSOR.CSV" })
                     }
                 }
 
