@@ -158,6 +158,9 @@ app.post('/api/flysight/handoffs/upload', asyncRoute(async (req,res) => {
   const client=await pool.connect();
   try{
     await client.query('BEGIN');
+    const fileCount=await client.query('SELECT count(*)::int AS n FROM flysight_handoff_files WHERE handoff_id=$1',[session.rows[0].id]);
+    const alreadyExists=await client.query('SELECT id FROM flysight_handoff_files WHERE handoff_id=$1 AND file_name=$2',[session.rows[0].id,name]);
+    if(!alreadyExists.rowCount && fileCount.rows[0].n>=2){await client.query('ROLLBACK');return res.status(400).json({error:'A handoff can contain at most two FlySight files.'});}
     const file=await client.query(
       `INSERT INTO flysight_handoff_files(handoff_id,file_name,file_size,sha256,total_chunks)
        VALUES($1,$2,$3,$4,$5)
@@ -168,10 +171,18 @@ app.post('/api/flysight/handoffs/upload', asyncRoute(async (req,res) => {
     );
     if(!file.rowCount){await client.query('ROLLBACK');return res.status(409).json({error:'A different file with this name is already in this handoff.'});}
     if(file.rows[0].completed_at){await client.query('COMMIT');return res.json({ok:true,complete:true});}
-    await client.query('INSERT INTO flysight_handoff_chunks(file_id,chunk_index,data) VALUES($1,$2,$3) ON CONFLICT(file_id,chunk_index) DO NOTHING',[file.rows[0].id,v.chunkIndex,bytes]);
+    const prior=await client.query('SELECT data FROM flysight_handoff_chunks WHERE file_id=$1 AND chunk_index=$2',[file.rows[0].id,v.chunkIndex]);
+    if(prior.rowCount && !Buffer.from(prior.rows[0].data).equals(bytes)){await client.query('ROLLBACK');return res.status(409).json({error:'A previously received chunk has different contents.'});}
+    if(!prior.rowCount) await client.query('INSERT INTO flysight_handoff_chunks(file_id,chunk_index,data) VALUES($1,$2,$3)',[file.rows[0].id,v.chunkIndex,bytes]);
     const count=await client.query('SELECT count(*)::int AS n FROM flysight_handoff_chunks WHERE file_id=$1',[file.rows[0].id]);
     const complete=count.rows[0].n===v.totalChunks;
-    if(complete) await client.query('UPDATE flysight_handoff_files SET completed_at=now() WHERE id=$1',[file.rows[0].id]);
+    if(complete){
+      const stored=await client.query('SELECT data FROM flysight_handoff_chunks WHERE file_id=$1 ORDER BY chunk_index',[file.rows[0].id]);
+      const actual=tokenDigest(Buffer.concat(stored.rows.map(x=>Buffer.from(x.data))).toString('base64'));
+      const expected=tokenDigest(v.sha256.toLowerCase());
+      if(actual!==expected){await client.query('DELETE FROM flysight_handoff_chunks WHERE file_id=$1',[file.rows[0].id]);await client.query('ROLLBACK');return res.status(422).json({error:'Uploaded file failed its SHA-256 integrity check.'});}
+      await client.query('UPDATE flysight_handoff_files SET completed_at=now() WHERE id=$1',[file.rows[0].id]);
+    }
     await client.query('COMMIT');
     res.status(complete?201:202).json({ok:true,complete,receivedChunks:count.rows[0].n,totalChunks:v.totalChunks});
   }catch(e){await client.query('ROLLBACK');throw e;}finally{client.release();}
