@@ -257,6 +257,8 @@ test('FlySight import accepts TRACK and SENSOR files together', () => {
 
 test('FlySight inbox offers explicit deletion after files are imported into the draft', () => {
   assert.match(ui, /id="clearFlySightInbox"/);
+  assert.match(ui, /const inboxStatus=document.getElementById\('flySightInboxStatus'\)/);
+  assert.match(ui, /inboxStatus\.textContent='Uploaded files deleted/);
   assert.match(ui, /method:'DELETE'/);
   assert.match(ui, /Uploaded files deleted from the secure inbox/);
 });
