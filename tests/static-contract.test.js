@@ -169,3 +169,18 @@ test('FlySight altitude profile uses imported altitude samples', () => {
   assert.match(ui, /aria-label=\"FlySight altitude profile\"/);
   assert.match(ui, /trackProfileHtml\(trackDraft\)/);
 });
+
+test('FlySight import auto-fills opening metrics before remaining jump details', () => {
+  assert.match(ui, /field\('Altitude at opening \(m\)','openingAltitude'/);
+  assert.match(ui, /form\.elements\.delay\.value=trackDraft\.deployment\.delaySeconds/);
+  assert.match(ui, /form\.elements\.openingAltitude\.value=trackDraft\.deployment\.openingAltitudeMeters/);
+  assert.match(ui, /form\.elements\.openingAltitudeLoss\.value=trackDraft\.deployment\.altitudeLossMeters/);
+  assert.match(ui, /Complete the remaining jump details and verify the estimated opening values/);
+});
+test('FlySight 2 native multi-line TRACK.CSV headers and sensor rows are supported', () => {
+  assert.match(ui, /startsWith\('\$FLYS'\)/);
+  assert.match(ui, /findIndex\(x=>x\.trim\(\)==='\$DATA'\)/);
+  assert.match(ui, /a\[0\]===\('\$'\+sensor\)/);
+  assert.match(ui, /\['GNSS','GPS','TRACK'\]/);
+  assert.match(ui, /function splitCsvLine\(line\)/);
+});
