@@ -73,8 +73,8 @@ test('objects are created through jump saves, never manually', () => {
 });
 
 test('cloud conflict cancellation never uploads local data over the cloud copy', () => {
-  assert.match(ui, /backupTime=window\\.createLocalRecoveryBackup\\(\\)/);
-  assert.match(ui, /if\\(!confirm\\('A cloud logbook already exists/);
+  assert.match(ui, /backupTime=window\.createLocalRecoveryBackup\(\)/);
+  assert.match(ui, /if\(!confirm\('A cloud logbook already exists/);
   assert.match(ui, /Your local records remain unchanged/);
   assert.doesNotMatch(ui, /gate\.style\.display='none';cloudReady=true;await syncCloud\(\);return/);
 });
