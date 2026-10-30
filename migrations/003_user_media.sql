@@ -1,0 +1,15 @@
+-- Private media metadata lives in Postgres; binary objects live in Neon Object Storage.
+CREATE TABLE IF NOT EXISTS user_media (
+  id UUID PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES app_users(id) ON DELETE CASCADE,
+  jump_key TEXT NOT NULL,
+  storage_key TEXT NOT NULL UNIQUE,
+  file_name TEXT NOT NULL,
+  mime_type TEXT NOT NULL,
+  media_type TEXT NOT NULL CHECK (media_type IN ('photo','video')),
+  size_bytes BIGINT NOT NULL CHECK (size_bytes > 0 AND size_bytes <= 3145728),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS user_media_owner_jump_idx
+  ON user_media(user_id, jump_key, created_at DESC);
