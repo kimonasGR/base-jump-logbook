@@ -4,7 +4,7 @@ Private, mobile-first BASE jumping logbook.
 
 ## Status
 
-The repository contains a private web logbook prototype with authenticated API routes, account-scoped cloud snapshot sync, local recovery backups, and FlySight GPX/CSV import. It is **not yet production-ready**. Native iOS Bluetooth source has been started, but an installable iOS app, complete BLE file transfer, physical-device validation, and cloud media storage are not complete.
+The repository contains a private web logbook prototype with authenticated API routes, account-scoped cloud snapshot sync, local recovery backups, and FlySight GPX/CSV import. It is **not yet production-ready**. Native iOS Bluetooth source includes device discovery, telemetry, a basic directory/file-read flow, packet sequencing, and transfer keep-alive. It remains a prototype: no installable Xcode project or physical-device validation yet.
 
 Photos and videos remain local to the device. Imported FlySight track and sensor summaries are included in the cloud-synced jump record.
 
@@ -34,11 +34,11 @@ Native iOS prototype source is in `native/ios/`:
 - `FlySightBLEClient.swift`: CoreBluetooth discovery, secure connection setup, battery/mode reads, GNSS notifications, device directory listing and CSV file downloads.
 - `Info.plist.fragment`: Bluetooth privacy usage description to merge into the app's Info.plist.
 
-These files are source components, not a complete Xcode project. Direct iPhone-to-FlySight file transfer is not implemented yet. The BLE implementation must be checked against the exact firmware and tested on a physical iPhone/FlySight 2 before use. See [the integration plan](docs/flysight-2-integration.md).
+These files are source components, not a complete Xcode project. The current file-transfer prototype lists device files and downloads selected files to the app's Documents directory; it does not modify or delete files on the FlySight. Go-Back-N receive sequencing and 15-second keep-alive are implemented, but retransmission behavior, MTU edge cases, interrupted transfers, and physical-device compatibility still require testing. The iOS Swift source is type-checked in GitHub Actions. See [the integration plan](docs/flysight-2-integration.md).
 
 ## Quality checks
 
-GitHub Actions runs `npm test` on pushes to `main` and pull requests.
+GitHub Actions runs `npm test` and type-checks the native iOS Swift sources against the iOS Simulator SDK on pushes to `main` and pull requests.
 
 ## Deployment
 
