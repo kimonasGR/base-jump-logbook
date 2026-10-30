@@ -6,7 +6,7 @@ Private, mobile-first BASE jumping logbook.
 
 The repository contains a private web logbook prototype with authenticated API routes, account-scoped cloud snapshot sync, local recovery backups, and FlySight GPX/CSV import. It is **not yet production-ready**. Native iOS Bluetooth source includes device discovery, telemetry, a basic directory/file-read flow, packet sequencing, and transfer keep-alive. It remains a prototype: the XcodeGen project builds for iOS Simulator, but has not been signed, installed on a physical iPhone, or validated with a FlySight device.
 
-Photos and videos remain local to the device. Imported FlySight track and sensor summaries are included in the cloud-synced jump record.
+Jump records and FlySight track data sync to the private Neon account. Photos and videos can be stored in the private `base-jump-media` Neon Object Storage bucket; uploads are limited to 3 MB per file. The bucket is already provisioned on the project's `main` branch. The media metadata migration and storage credentials must be applied/configured before cloud media uploads are active.
 
 ## Requirements
 
@@ -22,7 +22,11 @@ npm test
 npm start
 ```
 
-Configure `DATABASE_URL`, `NEON_AUTH_ISSUER`, `NEON_AUTH_JWKS_URL`, and `OPENAI_API_KEY` in your local `.env` or deployment environment. Never commit real credentials.
+Configure `DATABASE_URL`, `NEON_AUTH_ISSUER`, `NEON_AUTH_JWKS_URL`, and `OPENAI_API_KEY` in your local `.env` or deployment environment. To enable private media uploads, also set `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_ENDPOINT_URL_S3`, `AWS_REGION`, and `NEON_STORAGE_BUCKET` using credentials scoped to the Neon `main` branch. The bucket is private; the API returns short-lived signed download URLs. Never commit real credentials.
+
+## Database migrations
+
+Apply the SQL migrations in order. For the new private media backend, run `migrations/003_user_media.sql` against the same Neon database after reviewing it. The migration creates only the per-user media metadata table; binary files are stored in Neon Object Storage.
 
 ## FlySight 2
 
