@@ -251,3 +251,12 @@ test('FlySight import accepts TRACK and SENSOR files together', () => {
   assert.match(ui, /trackDraft\.sensorData\?'<div class=/);
   assert.match(ui, /Sensor files imported:/);
 });
+
+
+test('FlySight imports retain source-file provenance and SHA-256 fingerprints', () => {
+  assert.match(ui, /crypto\.subtle\.digest\('SHA-256'/);
+  assert.match(ui, /sourceFiles/);
+  assert.match(ui, /sha256/);
+  assert.match(ui, /Source files:/);
+  assert.match(ui, /existingIndex=sourceFiles\.findIndex\(x=>x\.kind===incoming\.kind\)/);
+});
