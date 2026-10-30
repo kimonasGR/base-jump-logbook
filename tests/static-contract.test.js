@@ -272,3 +272,18 @@ test('FlySight downloads enforce import-size and transfer-integrity limits', () 
   assert.ok(nativeBLE.includes('FileTransferError.sizeMismatch'));
   assert.ok(nativeBLE.includes('FileTransferError.transferInProgress'));
 });
+
+
+test('FlySight handoff uses short-lived hashed upload tokens and bounded chunk storage', () => {
+  assert.match(server, /randomBytes\(32\)/);
+  assert.match(server, /tokenDigest\(token\)/);
+  assert.match(server, /expires_at>now\(\)/);
+  assert.match(server, /handoffChunkBytes = 256 \* 1024/);
+  assert.match(server, /handoffFileLimit = 15 \* 1024 \* 1024/);
+  assert.match(server, /app\.post\('\/api\/flysight\/handoffs\/upload'/);
+  assert.match(server, /app\.get\('\/api\/flysight\/handoffs', requireUser/);
+  assert.match(server, /h\.user_id=\$3/);
+  assert.match(migration, /CREATE TABLE IF NOT EXISTS flysight_handoffs/);
+  assert.match(migration, /CREATE TABLE IF NOT EXISTS flysight_handoff_chunks/);
+  assert.match(migration, /ON DELETE CASCADE/);
+});
