@@ -2,6 +2,10 @@ import SwiftUI
 
 struct FlySightConnectionView: View {
     @StateObject private var bluetooth = FlySightBLEClient()
+    @State private var files: [FlySightBLEClient.FlySightFile] = []
+    @State private var downloadedFiles: [URL] = []
+    @State private var isListing = false
+    @State private var downloadingName: String?
 
     var body: some View {
         NavigationStack {
@@ -55,6 +59,55 @@ struct FlySightConnectionView: View {
                     }
                 }
 
+                Section("Device files · Idle mode only") {
+                    Button {
+                        isListing = true
+                        bluetooth.listDirectory(path: "/") { result in
+                            isListing = false
+                            if case .success(let entries) = result { files = entries }
+                        }
+                    } label: {
+                        if isListing { ProgressView("Reading directory…") }
+                        else { Label("Read FlySight files", systemImage: "folder") }
+                    }
+                    .disabled(bluetooth.state != .connected || isListing || downloadingName != nil)
+                    if files.isEmpty {
+                        Text("Switch FlySight to Idle mode (LED off), connect, then read the device directory.")
+                            .font(.footnote).foregroundStyle(.secondary)
+                    }
+                    ForEach(files.filter { $0.name.uppercased().hasSuffix(".CSV") }) { file in
+                        HStack {
+                            VStack(alignment: .leading) {
+                                Text(file.name)
+                                Text(ByteCountFormatter.string(fromByteCount: Int64(file.size), countStyle: .file))
+                                    .font(.caption).foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                            Button(downloadingName == file.name ? "Downloading…" : "Download") {
+                                download(file)
+                            }
+                            .disabled(downloadingName != nil || bluetooth.state != .connected)
+                        }
+                    }
+                    if downloadingName != nil {
+                        ProgressView(value: bluetooth.transferProgress)
+                        Button("Cancel transfer", role: .destructive) { bluetooth.cancelFileTransfer(); downloadingName = nil }
+                    }
+                    if !bluetooth.transferStatus.isEmpty {
+                        Text(bluetooth.transferStatus).font(.footnote).foregroundStyle(.secondary)
+                    }
+                }
+
+                if !downloadedFiles.isEmpty {
+                    Section("Saved on this iPhone") {
+                        ForEach(downloadedFiles, id: \.absoluteString) { url in
+                            ShareLink(item: url) {
+                                Label(url.lastPathComponent, systemImage: "square.and.arrow.up")
+                            }
+                        }
+                    }
+                }
+
                 Section {
                     Text("This is a native iOS integration prototype. Pairing, live telemetry and file transfer must be validated against the exact FlySight firmware and a physical device before operational use.")
                         .font(.footnote).foregroundStyle(.secondary)
@@ -65,6 +118,28 @@ struct FlySightConnectionView: View {
                 if bluetooth.state == .connected {
                     Button("Disconnect") { bluetooth.disconnect() }
                 }
+            }
+        }
+    }
+
+    private func download(_ file: FlySightBLEClient.FlySightFile) {
+        downloadingName = file.name
+        bluetooth.downloadFile(path: file.name, expectedSize: file.size) { result in
+            downloadingName = nil
+            switch result {
+            case .success(let data):
+                do {
+                    let folder = try FileManager.default.url(for: .documentDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
+                        .appendingPathComponent("FlySight Imports", isDirectory: true)
+                    try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+                    let destination = folder.appendingPathComponent(file.name)
+                    try data.write(to: destination, options: .atomic)
+                    if !downloadedFiles.contains(destination) { downloadedFiles.append(destination) }
+                } catch {
+                    bluetooth.transferStatus = "Could not save file: " + error.localizedDescription
+                }
+            case .failure:
+                break
             }
         }
     }
