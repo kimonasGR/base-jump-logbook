@@ -30,6 +30,30 @@ final class FlySightBLEClient: NSObject, ObservableObject {
     @Published private(set) var deviceMode: UInt8?
     @Published private(set) var latestGNSS: GNSSSample?
     @Published private(set) var discoveredDevices: [FlySightDevice] = []
+    @Published private(set) var transferStatus: String = ""
+    @Published private(set) var transferProgress: Double = 0
+
+    struct FlySightFile: Identifiable, Equatable {
+        let name: String
+        let size: UInt32
+        let attributes: UInt8
+        var id: String { name }
+    }
+
+    enum FileTransferError: LocalizedError {
+        case notConnected, idleModeRequired, missingCharacteristic, malformedPacket, deviceRejected(UInt8), timedOut, cancelled
+        var errorDescription: String? {
+            switch self {
+            case .notConnected: return "Connect to FlySight 2 first."
+            case .idleModeRequired: return "File transfer is only available in FlySight Idle mode. Switch the device to Idle (LED off)."
+            case .missingCharacteristic: return "FlySight file-transfer characteristics are unavailable."
+            case .malformedPacket: return "FlySight returned a malformed file-transfer packet."
+            case .deviceRejected(let command): return String(format: "FlySight rejected file-transfer command 0x%02X.", command)
+            case .timedOut: return "FlySight file transfer timed out."
+            case .cancelled: return "File transfer was cancelled."
+            }
+        }
+    }
 
     struct FlySightDevice: Identifiable {
         let peripheral: CBPeripheral
@@ -50,6 +74,15 @@ final class FlySightBLEClient: NSObject, ObservableObject {
     private var central: CBCentralManager!
     private var peripheral: CBPeripheral?
     private var characteristics: [CBUUID: CBCharacteristic] = [:]
+    private var pendingCommand: UInt8?
+    private var commandCompletion: ((Result<Void, Error>) -> Void)?
+    private var directoryEntries: [FlySightFile] = []
+    private var directoryCompletion: ((Result<[FlySightFile], Error>) -> Void)?
+    private var downloadBuffer = Data()
+    private var downloadExpectedSize: UInt32 = 0
+    private var downloadCompletion: ((Result<Data, Error>) -> Void)?
+    private var downloadPath: String?
+    private var transferTimeout: Task<Void, Never>?
 
     override init() {
         super.init()
@@ -78,6 +111,138 @@ final class FlySightBLEClient: NSObject, ObservableObject {
     func disconnect() {
         guard let peripheral else { return }
         central.cancelPeripheralConnection(peripheral)
+    }
+
+    /// Lists a device directory. Must be called while FlySight is in Idle mode.
+    func listDirectory(path: String = "/", completion: @escaping (Result<[FlySightFile], Error>) -> Void) {
+        guard state == .connected, peripheral != nil else { completion(.failure(FileTransferError.notConnected)); return }
+        guard deviceMode == 0 else { completion(.failure(FileTransferError.idleModeRequired)); return }
+        guard let tx = characteristics[filePacketIn], characteristics[filePacketOut] != nil else { completion(.failure(FileTransferError.missingCharacteristic)); return }
+        directoryEntries = []
+        directoryCompletion = completion
+        beginTimeout()
+        sendCommand(0x05, path: path, characteristic: tx)
+    }
+
+    /// Reads a file without modifying or deleting the source on the FlySight.
+    func downloadFile(path: String, expectedSize: UInt32 = 0, completion: @escaping (Result<Data, Error>) -> Void) {
+        guard state == .connected, peripheral != nil else { completion(.failure(FileTransferError.notConnected)); return }
+        guard deviceMode == 0 else { completion(.failure(FileTransferError.idleModeRequired)); return }
+        guard let tx = characteristics[filePacketIn], characteristics[filePacketOut] != nil else { completion(.failure(FileTransferError.missingCharacteristic)); return }
+        downloadBuffer = Data()
+        downloadExpectedSize = expectedSize
+        downloadCompletion = completion
+        downloadPath = path
+        transferProgress = 0
+        transferStatus = "Requesting " + path
+        beginTimeout()
+        var command = Data([0x02])
+        command.append(contentsOf: withUnsafeBytes(of: UInt32(0).littleEndian, Array.init))
+        command.append(contentsOf: withUnsafeBytes(of: UInt32(0).littleEndian, Array.init))
+        command.append(contentsOf: path.utf8)
+        command.append(0)
+        peripheral?.writeValue(command, for: tx, type: .withoutResponse)
+    }
+
+    func cancelFileTransfer() {
+        guard let tx = characteristics[filePacketIn], transferIsActive else { return }
+        peripheral?.writeValue(Data([0xff]), for: tx, type: .withoutResponse)
+        finishTransfer(.failure(FileTransferError.cancelled))
+    }
+
+    private var transferIsActive: Bool { directoryCompletion != nil || downloadCompletion != nil || commandCompletion != nil }
+
+    private func sendCommand(_ opcode: UInt8, path: String, characteristic: CBCharacteristic) {
+        var packet = Data([opcode])
+        packet.append(contentsOf: path.utf8)
+        packet.append(0)
+        peripheral?.writeValue(packet, for: characteristic, type: .withoutResponse)
+    }
+
+    private func beginTimeout() {
+        transferTimeout?.cancel()
+        transferTimeout = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: 30_000_000_000)
+            guard !Task.isCancelled else { return }
+            await MainActor.run { self?.finishTransfer(.failure(FileTransferError.timedOut)) }
+        }
+    }
+
+    private func finishTransfer(_ result: Result<Data, Error>) {
+        transferTimeout?.cancel()
+        transferTimeout = nil
+        if let completion = downloadCompletion {
+            downloadCompletion = nil
+            directoryCompletion = nil
+            downloadPath = nil
+            switch result {
+            case .success(let data): transferStatus = "Downloaded " + (downloadPath ?? "file")
+            case .failure(let error): transferStatus = error.localizedDescription
+            }
+            completion(result)
+        } else if case .failure(let error) = result, let completion = directoryCompletion {
+            directoryCompletion = nil
+            transferStatus = error.localizedDescription
+            completion(.failure(error))
+        }
+    }
+
+    private func finishDirectory(_ result: Result<[FlySightFile], Error>) {
+        transferTimeout?.cancel()
+        transferTimeout = nil
+        let completion = directoryCompletion
+        directoryCompletion = nil
+        if case .success(let files) = result { transferStatus = "Found \(files.count) files" }
+        if case .failure(let error) = result { transferStatus = error.localizedDescription }
+        completion?(result)
+    }
+
+    private func handleFilePacket(_ data: Data) {
+        guard let opcode = data.first else { return }
+        switch opcode {
+        case 0xf1:
+            guard data.count >= 2 else { return }
+            if let pending = pendingCommand, pending == data[1] {
+                pendingCommand = nil
+                commandCompletion?(.success(()))
+                commandCompletion = nil
+            }
+        case 0xf0:
+            guard data.count >= 2 else { return }
+            let error = FileTransferError.deviceRejected(data[1])
+            if directoryCompletion != nil { finishDirectory(.failure(error)) }
+            else { finishTransfer(.failure(error)) }
+        case 0x11:
+            guard data.count >= 24, directoryCompletion != nil else { return }
+            let nameBytes = data.subdata(in: 11..<24)
+            let name = String(decoding: nameBytes.prefix { $0 != 0 }, as: UTF8.self)
+            if name.isEmpty { finishDirectory(.success(directoryEntries)); return }
+            let size = data.subdata(in: 2..<6).withUnsafeBytes { $0.loadUnaligned(as: UInt32.self).littleEndian }
+            let attributes = data[10]
+            directoryEntries.append(FlySightFile(name: name, size: size, attributes: attributes))
+        case 0x10:
+            guard data.count >= 2, downloadCompletion != nil else { return }
+            let counter = data[1]
+            var ack = Data([0x12, counter])
+            if let tx = characteristics[filePacketIn] {
+                peripheral?.writeValue(ack, for: tx, type: .withoutResponse)
+            }
+            if data.count == 2 {
+                let result = downloadBuffer
+                if downloadExpectedSize > 0 && UInt32(result.count) != downloadExpectedSize {
+                    finishTransfer(.failure(FileTransferError.malformedPacket))
+                } else {
+                    finishTransfer(.success(result))
+                }
+                return
+            }
+            downloadBuffer.append(data.subdata(in: 2..<data.count))
+            if downloadExpectedSize > 0 {
+                transferProgress = min(1, Double(downloadBuffer.count) / Double(downloadExpectedSize))
+            }
+            beginTimeout()
+        default: break
+        }
     }
 
     private func discoverCharacteristics() {
@@ -156,6 +321,8 @@ extension FlySightBLEClient: CBCentralManagerDelegate {
 
     func centralManager(_ central: CBCentralManager, didDisconnectPeripheral peripheral: CBPeripheral, error: Error?) {
         characteristics.removeAll()
+        if directoryCompletion != nil { finishDirectory(.failure(FileTransferError.cancelled)) }
+        if downloadCompletion != nil { finishTransfer(.failure(FileTransferError.cancelled)) }
         state = .disconnected(error?.localizedDescription ?? "Disconnected")
     }
 }
@@ -190,6 +357,7 @@ extension FlySightBLEClient: CBPeripheralDelegate {
             return
         }
         guard let data = characteristic.value else { return }
+        if characteristic.uuid == filePacketOut { handleFilePacket(data) }
         if characteristic.uuid == gnssMeasurement { latestGNSS = decodeGNSS(data) }
         if characteristic.uuid == batteryLevel, let level = data.first { batteryPercent = Int(level) }
         if characteristic.uuid == deviceModeCharacteristic, let mode = data.first { deviceMode = Int(mode) }
