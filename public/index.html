@@ -63,15 +63,15 @@ window.setCloudSnapshot=x=>{if(!x||!Array.isArray(x.jumps)||!Array.isArray(x.obj
   </section>
 </div>
 <script type="module">
-import { createAuthClient } from 'https://esm.sh/@neondatabase/auth';
+import { createInternalNeonAuth } from 'https://esm.sh/@neondatabase/auth';
 const AUTH_URL='https://ep-young-truth-badvxgct.neonauth.c-8.eu-central-1.aws.neon.tech/neondb/auth';
-const auth=createAuthClient(AUTH_URL);
+const neonAuth=createInternalNeonAuth(AUTH_URL);
+const auth=neonAuth.adapter;
 const gate=document.getElementById('authGate'), errorBox=document.getElementById('authError'), submit=document.getElementById('authSubmit'), toggle=document.getElementById('authToggle'), status=document.getElementById('authStatus');
 let creating=false, cloudReady=false, syncBusy=false, syncAgain=false, bearer=null;
 function showError(e){errorBox.textContent=e?.message||String(e)||'Authentication failed.'}
 async function getToken(){
-  const r=await auth.token();
-  const token=r?.data?.token||r?.token;
+  const token=await neonAuth.getJWTToken();
   if(!token)throw Error('Could not obtain a secure access token. Please sign in again.');
   return token;
 }
