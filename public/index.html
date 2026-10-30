@@ -195,6 +195,9 @@ async function syncCloud(){
   finally{syncBusy=false;if(syncAgain){syncAgain=false;syncCloud()}}
 }
 window.cloudSync=()=>{if(cloudReady)syncCloud()};
+// Retry a locally saved snapshot after connectivity returns or the app is reopened.
+window.addEventListener('online',()=>{if(cloudReady)syncCloud()});
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&cloudReady)syncCloud()});
 window.signOutLogbook=async()=>{try{await auth.signOut();cloudReady=false;bearer=null;cloudUpdatedAt=null;gate.style.display='flex';status.textContent='Signed out';errorBox.textContent='';}catch(e){showError(e)}};
 async function enterApp(){
   const session=await auth.getSession();
@@ -358,6 +361,9 @@ async function syncCloud(){
   finally{syncBusy=false;if(syncAgain){syncAgain=false;syncCloud()}}
 }
 window.cloudSync=()=>{if(cloudReady)syncCloud()};
+// Retry a locally saved snapshot after connectivity returns or the app is reopened.
+window.addEventListener('online',()=>{if(cloudReady)syncCloud()});
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&cloudReady)syncCloud()});
 window.signOutLogbook=async()=>{try{await auth.signOut();cloudReady=false;bearer=null;cloudUpdatedAt=null;gate.style.display='flex';status.textContent='Signed out';errorBox.textContent='';}catch(e){showError(e)}};
 async function enterApp(){
   const session=await auth.getSession();
