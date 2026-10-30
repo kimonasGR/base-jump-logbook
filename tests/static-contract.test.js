@@ -110,3 +110,20 @@ test('AI draft converts boolean and opening-direction fields to UI option values
   assert.match(ui, /opening_direction_degrees==='number'/);
   assert.match(ui, /new Option\(String\(display\),String\(display\)\)/);
 });
+
+test('snapshot writes use optimistic concurrency and reject stale device copies', () => {
+  const start = server.indexOf("app.put('/api/snapshot'");
+  const end = server.indexOf("\n\napp.use((err", start);
+  const handler = server.slice(start, end);
+  assert.match(handler, /expectedUpdatedAt/);
+  assert.match(handler, /WHERE user_snapshots\.updated_at=\$3::timestamptz/);
+  assert.match(handler, /res\.status\(409\)/);
+  assert.match(handler, /SNAPSHOT_CONFLICT/);
+});
+
+test('frontend pauses cloud sync on conflict and tracks the acknowledged cloud version', () => {
+  assert.match(ui, /cloudUpdatedAt=null/);
+  assert.match(ui, /expectedUpdatedAt:cloudUpdatedAt/);
+  assert.match(ui, /cloudUpdatedAt=result\.updatedAt/);
+  assert.match(ui, /cloudReady=false;syncAgain=false;status\.textContent='Sync paused/);
+});
