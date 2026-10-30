@@ -147,3 +147,13 @@ test('FlySight importer parses GPX and CSV into bounded GPS track points', () =>
 });
 
 test('FlySight route preview is rendered from bounded GPS coordinates', () => {\n  assert.match(ui, /function trackPreviewHtml\(t\)/);\n  assert.match(ui, /aria-label=\"Imported FlySight GPS track\"/);\n  assert.match(ui, /trackPreviewHtml\(trackDraft\)/);\n});\n
+test('FlySight import estimates deployment delay and altitude loss for review', () => {
+  assert.match(ui, /velD=find\(\['veld','down velocity','vertical velocity'\]\)/);
+  assert.match(ui, /function detectDeployment\(points\)/);
+  assert.match(ui, /startIndex=rows\.findIndex/);
+  assert.match(ui, /delaySeconds/);
+  assert.match(ui, /altitudeLossMeters/);
+  assert.match(ui, /openingAltitudeLoss/);
+  assert.match(ui, /Apply estimated opening delay and altitude loss/);
+  assert.match(ui, /confidence/);
+});
