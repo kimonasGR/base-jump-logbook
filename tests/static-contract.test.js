@@ -186,7 +186,7 @@ test('FlySight 2 native multi-line TRACK.CSV headers and sensor rows are support
 });
 
 test('FlySight import reverse-geocodes GPS coordinates into country field', () => {
-  assert.match(ui, /api\\/geocode\\/reverse\\?lat=/);
+  assert.match(ui, /api\/geocode\/reverse\?lat=/);
   assert.match(ui, /Authorization:'Bearer '\+bearer/);
   assert.match(ui, /if\(place\.country&&!form\.elements\.country\.value\.trim\(\)\)\{form\.elements\.country\.value=place\.country/);
 });
@@ -204,7 +204,7 @@ test('FlySight 2 SENSOR.CSV imports sensor schemas, units, variables and samples
   assert.match(ui, /a\[0\]==='\$COL'/);
   assert.match(ui, /a\[0\]==='\$UNIT'/);
   assert.match(ui, /a\[0\]==='\$VAR'/);
-  assert.match(ui, /sensor\.rows\.push\(row\)/);
+  assert.match(ui, /sensor\.samples\+\+/);
   assert.match(ui, /name==='SENSOR\.CSV'\|\|name\.includes\('SENSOR'\)/);
 });
 test('FlySight import accepts TRACK and SENSOR files together', () => {
