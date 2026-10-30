@@ -71,7 +71,15 @@ async function startVoiceAll(){
     for(const [key,name] of Object.entries(map)){
      const value=draft[key]; if(!name||value===null||value===undefined||value==='')continue;
      const el=f.elements[name];if(!el)continue;
-     if(el.type==='checkbox')el.checked=Boolean(value);else if(el.type==='hidden'&&el.parentElement?.querySelector('[data-pills]')){el.value=String(value)}else el.value=String(value);
+     let display=value;
+     if(key==='off_heading'||key==='correction')display=value?'Yes':'No';
+     if(el.tagName==='SELECT'&&![...el.options].some(o=>o.value===String(display)))el.add(new Option(String(display),String(display)));
+     el.value=String(display);
+    }
+    if(typeof draft.opening_direction_degrees==='number'){
+     const side=draft.opening_direction_side==='L'?' Left':draft.opening_direction_side==='R'?' Right':'';
+     const direction=String(draft.opening_direction_degrees)+'°'+side;
+     const el=f.elements.openingDirection;if(el){if(![...el.options].some(o=>o.value===direction))el.add(new Option(direction,direction));el.value=direction}
     }
     if(draft.date_time){const dt=new Date(draft.date_time);if(!Number.isNaN(dt.getTime())){f.elements.date.value=dt.toISOString().slice(0,10);f.elements.time.value=dt.toTimeString().slice(0,5)}}
     if(draft.height_m!==null&&draft.height_m!==undefined&&f.elements.heightUnit.value==='ft'&&f.elements.height.value)f.elements.height.value=String(Math.round(Number(draft.height_m)*3.28084));
