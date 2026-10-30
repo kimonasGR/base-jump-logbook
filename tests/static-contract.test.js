@@ -260,6 +260,8 @@ test('native FlySight upload retries transient HTTP and transport failures', () 
   assert.match(nativeFlySight, /for attempt in 0\.\.\<3/);
   assert.match(nativeFlySight, /http\.statusCode == 408 \|\| http\.statusCode == 429 \|\| http\.statusCode >= 500/);
   assert.match(nativeFlySight, /Task\.sleep\(nanoseconds:/);
+  assert.match(nativeFlySight, /catch is CancellationError/);
+  assert.match(nativeFlySight, /try await Task\.sleep/);
 });
 
 test('FlySight inbox offers explicit deletion after files are imported into the draft', () => {
