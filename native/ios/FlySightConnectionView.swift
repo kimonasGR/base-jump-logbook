@@ -224,11 +224,7 @@ struct FlySightConnectionView: View {
                     request.setValue("application/json", forHTTPHeaderField: "Content-Type")
                     request.setValue(token, forHTTPHeaderField: "X-FlySight-Handoff")
                     request.httpBody = try JSONSerialization.data(withJSONObject: payload)
-                    let (responseData, response) = try await URLSession.shared.data(for: request)
-                    guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
-                        let detail = (try? JSONSerialization.jsonObject(with: responseData) as? [String: Any])?["error"] as? String
-                        throw UploadError.message(detail ?? "Upload failed (HTTP \((response as? HTTPURLResponse)?.statusCode ?? 0)).")
-                    }
+                    _ = try await sendUploadRequest(request)
                     uploadStatus = "\(name): \(index + 1)/\(totalChunks) chunks"
                 }
                 uploadStatus = "\(name) uploaded and integrity-checked."
@@ -237,6 +233,29 @@ struct FlySightConnectionView: View {
         } catch {
             uploadStatus = error.localizedDescription
         }
+    }
+
+    private func sendUploadRequest(_ request: URLRequest) async throws -> (Data, HTTPURLResponse) {
+        for attempt in 0..<3 {
+            do {
+                let (data, response) = try await URLSession.shared.data(for: request)
+                guard let http = response as? HTTPURLResponse else {
+                    throw UploadError.message("Upload returned an invalid server response.")
+                }
+                if (200...299).contains(http.statusCode) { return (data, http) }
+                let retryable = http.statusCode == 408 || http.statusCode == 429 || http.statusCode >= 500
+                let detail = (try? JSONSerialization.jsonObject(with: data) as? [String: Any])?["error"] as? String
+                if !retryable || attempt == 2 {
+                    throw UploadError.message(detail ?? "Upload failed (HTTP \(http.statusCode)).")
+                }
+            } catch let error as UploadError {
+                throw error
+            } catch {
+                if attempt == 2 { throw error }
+            }
+            try? await Task.sleep(nanoseconds: UInt64(1 << attempt) * 1_000_000_000)
+        }
+        throw UploadError.message("Upload failed after three attempts.")
     }
 
     private enum UploadError: LocalizedError {
