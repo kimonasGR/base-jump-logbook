@@ -1,6 +1,6 @@
 import Foundation
 import Combine
-import CoreBluetooth
+@preconcurrency import CoreBluetooth
 
 /// CoreBluetooth transport for FlySight 2. This is a native iOS component;
 /// it is not available from Safari/Web Bluetooth.
@@ -361,7 +361,7 @@ extension FlySightBLEClient: CBPeripheralDelegate {
         if characteristic.uuid == filePacketOut { handleFilePacket(data) }
         if characteristic.uuid == gnssMeasurement { latestGNSS = decodeGNSS(data) }
         if characteristic.uuid == batteryLevel, let level = data.first { batteryPercent = Int(level) }
-        if characteristic.uuid == deviceModeCharacteristic, let mode = data.first { deviceMode = Int(mode) }
+        if characteristic.uuid == deviceModeCharacteristic, let mode = data.first { deviceMode = mode }
         if characteristic.uuid == filePacketIn { state = .connected }
     }
 }
