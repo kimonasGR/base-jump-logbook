@@ -137,8 +137,7 @@ final class FlySightBLEClient: NSObject, ObservableObject {
         transferStatus = "Requesting " + path
         beginTimeout()
         var command = Data([0x02])
-        command.append(contentsOf: withUnsafeBytes(of: UInt32(0).littleEndian, Array.init))
-        command.append(contentsOf: withUnsafeBytes(of: UInt32(0).littleEndian, Array.init))
+        command.append(contentsOf: [UInt8](repeating: 0, count: 8))
         command.append(contentsOf: path.utf8)
         command.append(0)
         peripheral?.writeValue(command, for: tx, type: .withoutResponse)
