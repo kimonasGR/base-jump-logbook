@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 
 const server = await readFile(new URL('../src/server.js', import.meta.url), 'utf8');
+const ui = await readFile(new URL('../public/index.html', import.meta.url), 'utf8');
 const migration = await readFile(new URL('../migrations/001_initial.sql', import.meta.url), 'utf8');
 const vercel = JSON.parse(await readFile(new URL('../vercel.json', import.meta.url), 'utf8'));
 
@@ -64,3 +65,24 @@ test('dangerous values are not committed in the example environment file', async
 });
 
 test('API server module loads without schema construction errors', async () => { process.env.VERCEL = '1'; const server = await import('../src/server.js'); assert.equal(typeof server.default, 'function'); });
+
+test('objects are created through jump saves, never manually', () => {
+  assert.doesNotMatch(ui, /id="newObject"/);
+  assert.match(ui, /const objectRecord=\{id:objectId,name:d\.objectName\.trim\(\)/);
+  assert.match(ui, /Objects are added automatically when you save a jump/);
+});
+
+test('cloud conflict cancellation never uploads local data over the cloud copy', () => {
+  assert.match(ui, /if\(localHasData&&!confirm\([\s\S]*?throw Error\('Cloud data was not loaded/);
+  assert.doesNotMatch(ui, /gate\.style\.display='none';cloudReady=true;await syncCloud\(\);return/);
+});
+
+test('cloud restore retains local-only media for matching jump IDs', () => {
+  assert.match(ui, /const localMedia=new Map\(db\.jumps\.map\(j=>\[j\.id,j\.media\|\|\[\]\]\)\)/);
+  assert.match(ui, /media:j\.media\|\|localMedia\.get\(j\.id\)\|\|\[\]/);
+});
+
+test('settings accurately disclose local-only media and current voice limitations', () => {
+  assert.match(ui, /Photos, videos and FlySight files are currently stored only on this device/);
+  assert.match(ui, /Voice capture currently transcribes into Private Notes only/);
+});
