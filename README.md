@@ -34,11 +34,11 @@ Native iOS prototype source is in `native/ios/`:
 - `FlySightBLEClient.swift`: CoreBluetooth discovery, secure connection setup, battery/mode reads, GNSS notifications, device directory listing and CSV file downloads.
 - `Info.plist.fragment`: Bluetooth privacy usage description to merge into the app's Info.plist.
 
-These files are source components, not a complete Xcode project. The current file-transfer prototype lists device files and downloads selected files to the app's Documents directory; it does not modify or delete files on the FlySight. Go-Back-N receive sequencing and 15-second keep-alive are implemented, but retransmission behavior, MTU edge cases, interrupted transfers, and physical-device compatibility still require testing. The iOS Swift source is type-checked in GitHub Actions. See [the integration plan](docs/flysight-2-integration.md).
+An XcodeGen project definition is provided at `native/ios/project.yml`; generate the `.xcodeproj` with `brew install xcodegen && cd native/ios && xcodegen generate`. GitHub Actions builds the generated app for the iOS Simulator. The current file-transfer prototype lists device files and downloads selected files to the app's Documents directory; it does not modify or delete files on the FlySight. Go-Back-N receive sequencing and 15-second keep-alive are implemented, but retransmission behavior, MTU edge cases, interrupted transfers, and physical-device compatibility still require testing. The iOS Swift source is type-checked in GitHub Actions. See [the integration plan](docs/flysight-2-integration.md).
 
 ## Quality checks
 
-GitHub Actions runs `npm test` and type-checks the native iOS Swift sources against the iOS Simulator SDK on pushes to `main` and pull requests.
+GitHub Actions runs `npm test`, type-checks the native iOS Swift sources, and builds the generated iOS Simulator app on pushes to `main` and pull requests.
 
 ## Deployment
 
