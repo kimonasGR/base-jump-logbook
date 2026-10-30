@@ -172,11 +172,12 @@ final class FlySightBLEClient: NSObject, ObservableObject {
         transferTimeout?.cancel()
         transferTimeout = nil
         if let completion = downloadCompletion {
+            let completedPath = downloadPath ?? "file"
             downloadCompletion = nil
             directoryCompletion = nil
             downloadPath = nil
             switch result {
-            case .success(let data): transferStatus = "Downloaded " + (downloadPath ?? "file")
+            case .success: transferStatus = "Downloaded " + completedPath
             case .failure(let error): transferStatus = error.localizedDescription
             }
             completion(result)
@@ -214,6 +215,7 @@ final class FlySightBLEClient: NSObject, ObservableObject {
             else { finishTransfer(.failure(error)) }
         case 0x11:
             guard data.count >= 24, directoryCompletion != nil else { return }
+            beginTimeout()
             let nameBytes = data.subdata(in: 11..<24)
             let name = String(decoding: nameBytes.prefix { $0 != 0 }, as: UTF8.self)
             if name.isEmpty { finishDirectory(.success(directoryEntries)); return }
@@ -223,7 +225,7 @@ final class FlySightBLEClient: NSObject, ObservableObject {
         case 0x10:
             guard data.count >= 2, downloadCompletion != nil else { return }
             let counter = data[1]
-            var ack = Data([0x12, counter])
+            let ack = Data([0x12, counter])
             if let tx = characteristics[filePacketIn] {
                 peripheral?.writeValue(ack, for: tx, type: .withoutResponse)
             }
