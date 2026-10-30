@@ -293,6 +293,7 @@ app.put('/api/snapshot', requireUser, asyncRoute(async (req,res) => {
 
 app.use((err, _req, res, _next) => {
   if (err instanceof z.ZodError) return res.status(400).json({error:'Validation failed.', details:err.issues.map(i=>({field:i.path.join('.'),message:i.message}))});
+  if (err?.code === '42P01' && /user_media/.test(err?.message||'')) return res.status(503).json({error:'Private media storage is waiting for its database migration.',code:'MEDIA_SCHEMA_NOT_READY'});
   if (err?.code === 'LIMIT_FILE_SIZE') return res.status(413).json({error:err?.field==='file'?'Photos and videos must be 3 MB or smaller.':'Audio file must be 20 MB or smaller.'});
   if (err?.code === 'LIMIT_UNEXPECTED_FILE') return res.status(400).json({error:'Upload one file at a time.'});
   console.error(err); res.status(500).json({error:'Unexpected server error.'});
