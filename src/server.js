@@ -158,6 +158,13 @@ app.post('/api/flysight/handoffs/upload', asyncRoute(async (req,res) => {
   const client=await pool.connect();
   try{
     await client.query('BEGIN');
+    // Serialize uploads for this handoff. This closes the race where two
+    // simultaneous first-file uploads could both observe fewer than two files.
+    const lockedSession=await client.query(
+      'SELECT id FROM flysight_handoffs WHERE id=$1 AND expires_at>now() AND consumed_at IS NULL FOR UPDATE',
+      [session.rows[0].id]
+    );
+    if(!lockedSession.rowCount){await client.query('ROLLBACK');return res.status(401).json({error:'Handoff token is invalid or expired.'});}
     const fileCount=await client.query('SELECT count(*)::int AS n FROM flysight_handoff_files WHERE handoff_id=$1',[session.rows[0].id]);
     const alreadyExists=await client.query('SELECT id FROM flysight_handoff_files WHERE handoff_id=$1 AND file_name=$2',[session.rows[0].id,name]);
     if(!alreadyExists.rowCount && fileCount.rows[0].n>=2){await client.query('ROLLBACK');return res.status(400).json({error:'A handoff can contain at most two FlySight files.'});}
