@@ -23,3 +23,16 @@ jobs:
       - uses: actions/checkout@v4
       - name: Type-check native iOS sources
         run: xcrun --sdk iphonesimulator swiftc -typecheck -target arm64-apple-ios17.0-simulator native/ios/FlySightBLEClient.swift native/ios/FlySightConnectionView.swift native/ios/FlySightLogbookApp.swift
+
+  ios-app-build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install XcodeGen
+        run: brew install xcodegen
+      - name: Generate Xcode project
+        working-directory: native/ios
+        run: xcodegen generate
+      - name: Build iOS Simulator app
+        working-directory: native/ios
+        run: xcodebuild -project BASEJumpLogbook.xcodeproj -scheme BASEJumpLogbook -sdk iphonesimulator -configuration Debug -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build
