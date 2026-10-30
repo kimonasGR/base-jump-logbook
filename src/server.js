@@ -52,6 +52,18 @@ async function requireUser(req, res, next) {
 
 app.get('/api/health', (_req, res) => res.json({ ok: true, service: 'base-jump-logbook-api', voiceExtraction: Boolean(process.env.OPENAI_API_KEY), authConfigured: Boolean(jwks) }));
 app.get('/api/me', requireUser, (req, res) => res.json({ userId: req.user.id }));
+app.get('/api/geocode/reverse', requireUser, asyncRoute(async (req,res) => {
+  const latitude=Number(req.query.lat),longitude=Number(req.query.lon);
+  if(!Number.isFinite(latitude)||Math.abs(latitude)>90||!Number.isFinite(longitude)||Math.abs(longitude)>180) return res.status(400).json({error:'Valid latitude and longitude are required.'});
+  const url=new URL('https://nominatim.openstreetmap.org/reverse');
+  url.searchParams.set('format','jsonv2');url.searchParams.set('lat',String(latitude));url.searchParams.set('lon',String(longitude));url.searchParams.set('zoom','3');url.searchParams.set('addressdetails','1');
+  const response=await fetch(url,{headers:{'User-Agent':'BASEJumpLogbook/1.0 (country lookup)','Accept-Language':'en'}});
+  if(!response.ok) return res.status(502).json({error:'Country lookup service is temporarily unavailable.'});
+  const data=await response.json();
+  res.set('Cache-Control','private, max-age=86400');
+  res.json({country:data.address?.country||null,countryCode:data.address?.country_code||null});
+}));
+
 
 const objectSchema = z.object({ name: z.string().trim().min(1).max(160), country: z.string().max(100).optional().nullable(), latitude: z.number().min(-90).max(90).optional().nullable(), longitude: z.number().min(-180).max(180).optional().nullable(), height_m: z.number().nonnegative().max(100000).optional().nullable(), object_type: z.enum(['B','A','S','E','Other']), object_type_other: z.string().max(160).optional().nullable(), metadata: z.record(z.string(), z.unknown()).optional() }).refine(v => v.object_type !== 'Other' || Boolean(v.object_type_other?.trim()), { message: 'Specify object type when Other is selected.', path: ['object_type_other'] });
 const gearSchema = z.object({ name: z.string().trim().min(1).max(100), rig: z.string().max(160).optional().nullable(), suit: z.string().max(160).optional().nullable(), pilot_chute: z.string().max(160).optional().nullable(), slider_configuration: z.string().max(160).optional().nullable(), metadata: z.record(z.string(), z.unknown()).optional() });
