@@ -94,9 +94,9 @@ test('settings accurately disclose local-only media and current voice limitation
 });
 
 test('jump media uses private Neon Object Storage with user-scoped metadata', () => {
-  assert.match(server, /app\.post\('\\/api\\/media', requireUser, mediaUpload\.single\('file'\)/);
-  assert.match(server, /app\.get\('\\/api\\/media\\/:id\\/url', requireUser/);
-  assert.match(server, /app\.delete\('\\/api\\/media\\/:id', requireUser/);
+  assert.ok(server.includes("app.post('/api/media', requireUser, mediaUpload.single('file')"));
+  assert.ok(server.includes("app.get('/api/media/:id/url', requireUser"));
+  assert.ok(server.includes("app.delete('/api/media/:id', requireUser"));
   assert.match(server, /new S3Client\(\{[\s\S]*forcePathStyle: true/);
   assert.match(server, /getSignedUrl\(s3,[\s\S]*expiresIn:900/);
   assert.match(server, /WHERE id=\$1 AND user_id=\$2/);
