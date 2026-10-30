@@ -255,6 +255,12 @@ test('FlySight import accepts TRACK and SENSOR files together', () => {
 });
 
 
+test('FlySight inbox offers explicit deletion after files are imported into the draft', () => {
+  assert.match(ui, /id="clearFlySightInbox"/);
+  assert.match(ui, /method:'DELETE'/);
+  assert.match(ui, /Uploaded files deleted from the secure inbox/);
+});
+
 test('FlySight imports retain source-file provenance and SHA-256 fingerprints', () => {
   assert.match(ui, /crypto\.subtle\.digest\('SHA-256'/);
   assert.match(ui, /sourceFiles/);
