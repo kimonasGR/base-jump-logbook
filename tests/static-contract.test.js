@@ -198,3 +198,17 @@ test('Reverse geocoding is authenticated and validates coordinates', () => {
   assert.match(server, /Math\.abs\(latitude\)>90/);
   assert.match(server, /address\?\.country/);
 });
+
+test('FlySight 2 SENSOR.CSV imports sensor schemas, units, variables and samples', () => {
+  assert.match(ui, /function parseFlySightSensorCsv\(raw\)/);
+  assert.match(ui, /a\[0\]==='\$COL'/);
+  assert.match(ui, /a\[0\]==='\$UNIT'/);
+  assert.match(ui, /a\[0\]==='\$VAR'/);
+  assert.match(ui, /sensor\.rows\.push\(row\)/);
+  assert.match(ui, /name==='SENSOR\.CSV'\|\|name\.includes\('SENSOR'\)/);
+});
+test('FlySight import accepts TRACK and SENSOR files together', () => {
+  assert.match(ui, /id="flySight" type="file" accept="\.gpx,\.csv" multiple/);
+  assert.match(ui, /trackDraft\.sensorData\?'<div class=/);
+  assert.match(ui, /Sensor files imported:/);
+});
