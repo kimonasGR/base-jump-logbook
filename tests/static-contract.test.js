@@ -89,8 +89,8 @@ test('cloud restore retains local-only media for matching jump IDs', () => {
   assert.match(ui, /local\.find\(l=>l\.storageId===m\.storageId\)/);
 });
 
-test('settings accurately disclose local-only media and current voice limitations', () => {
-  assert.match(ui, /Photos and videos upload to private Neon Object Storage when storage credentials are configured; otherwise they remain on this device/);
+test('settings accurately disclose cloud media configuration and current voice limitations', () => {
+  assert.match(ui, /Photos and videos upload to private Neon Object Storage when configured; otherwise they remain on this device/);
   assert.match(ui, /Records audio and sends it to the private AI extraction endpoint/);
   assert.match(ui, /nothing is saved until you review and submit the jump/);
 });
