@@ -8,6 +8,7 @@
 </style></head><body>
 <div class="app">
 <header class="top"><div><div class="eyebrow">PERSONAL JUMP RECORDS</div><div class="brand">BASE <span>LOGBOOK</span></div></div><button class="iconbtn" id="settingsTop" aria-label="Settings">⚙</button></header>
+<div id="authStatus" class="muted small" style="margin:-10px 0 14px">Cloud account: checking…</div>
 <div class="tabs" id="tabs"><button class="tab active" data-view="logbook">Logbook</button><button class="tab" data-view="objects">Objects</button><button class="tab" data-view="gear">Gear presets</button><button class="tab" data-view="settings">Settings</button></div>
 <main id="main"></main>
 </div>
@@ -16,7 +17,7 @@
 const KEY='baseLogbookMvp.v1';
 const defaults={jumps:[],objects:[],gears:[],options:{'Slider Configuration':['Slider up','Slider down','Slider off','Slick terminal'],'Pilot Chute':['42 inch','36 inch','38 inch'],'Suit':['Wingsuit','Track suit','No suit'],'Rig':[],'Jump Type':['Standard','Wingsuit','Tracking','Tandem','Other'],'Exit manoeuvre':['Stable','Front flip','Back flip','Other'],'Deployment Method':['Stowed','Hand-held','PCA','Static line','Direct bag'],'Wind strength':['Calm','Light','Moderate','Strong']},settings:{heightUnit:'m',windUnit:'m/s',timeZone:'local'}};
 let db=load(),view='logbook',editing=null,objectEditing=null,gearEditing=null,query='',filterCountry='',filterType='',filterSuit='',mediaDraft=[];
-function load(){try{return {...structuredClone(defaults),...JSON.parse(localStorage.getItem(KEY)||'{}')}}catch{return structuredClone(defaults)}}function persist(){localStorage.setItem(KEY,JSON.stringify(db))}function esc(s=''){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}function uid(){return crypto.randomUUID?crypto.randomUUID():String(Date.now()+Math.random())}function nowDate(){return new Date().toISOString().slice(0,10)}function options(name){const fixed={objectType:['B','A','S','E','Other'],yesNo:['Yes','No'],yesNoNa:['Yes','No','N/A'],openingDirection:['0°','45° Left','45° Right','90° Left','90° Right','135° Left','135° Right','180°'],skyCover:['Clear','Cloudy','Precipitation','Fog'],lighting:['Sun','Shade','Night']};return fixed[name]||db.options[name]||[]}function opts(name,selected='',includeBlank=true){return (includeBlank?'<option value="">Select…</option>':'')+options(name).map(v=>`<option ${v===selected?'selected':''} value="${esc(v)}">${esc(v)}</option>`).join('')}
+function load(){try{return {...structuredClone(defaults),...JSON.parse(localStorage.getItem(KEY)||'{}')}}catch{return structuredClone(defaults)}}function persist(){localStorage.setItem(KEY,JSON.stringify(db));window.cloudSync?.()}function esc(s=''){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}function uid(){return crypto.randomUUID?crypto.randomUUID():String(Date.now()+Math.random())}function nowDate(){return new Date().toISOString().slice(0,10)}function options(name){const fixed={objectType:['B','A','S','E','Other'],yesNo:['Yes','No'],yesNoNa:['Yes','No','N/A'],openingDirection:['0°','45° Left','45° Right','90° Left','90° Right','135° Left','135° Right','180°'],skyCover:['Clear','Cloudy','Precipitation','Fog'],lighting:['Sun','Shade','Night']};return fixed[name]||db.options[name]||[]}function opts(name,selected='',includeBlank=true){return (includeBlank?'<option value="">Select…</option>':'')+options(name).map(v=>`<option ${v===selected?'selected':''} value="${esc(v)}">${esc(v)}</option>`).join('')}
 function field(label,name,value='',type='text',extra=''){return `<div class="field ${extra}"><label for="${name}">${label}</label><input id="${name}" name="${name}" type="${type}" value="${esc(value??'')}" /></div>`}function selectField(label,name,value='',listName=name,extra=''){return `<div class="field ${extra}"><label for="${name}">${label}</label><select id="${name}" name="${name}">${opts(listName,value)}</select></div>`}function area(label,name,value='',extra=''){return `<div class="field ${extra}"><label for="${name}">${label}</label><textarea id="${name}" name="${name}" placeholder="Optional">${esc(value||'')}</textarea></div>`}function pillGroup(label,name,values,selected){return `<div class="field full"><label>${label}</label><div class="pillrow" data-pills="${name}">${values.map(v=>`<button type="button" class="pill ${selected===v?'selected':''}" data-value="${esc(v)}">${esc(v)}</button>`).join('')}</div><input type="hidden" name="${name}" value="${esc(selected||'')}" /></div>`}
 function header(title,desc,button=''){return `<div class="row between" style="margin:4px 0 14px"><div><div class="eyebrow">BASE JUMP LOGBOOK</div><h1 style="font-size:24px;margin:3px 0">${title}</h1><div class="muted small">${desc}</div></div>${button}</div>`}
 function render(){document.querySelectorAll('[data-view]').forEach(b=>b.classList.toggle('active',b.dataset.view===view));document.getElementById('main').innerHTML=view==='logbook'?renderLogbook():view==='objects'?renderObjects():view==='gear'?renderGear():renderSettings();bindView()}
@@ -45,4 +46,83 @@ function download(name,content,type){let a=document.createElement('a');a.href=UR
 function startDictation(target,status){let SR=window.SpeechRecognition||window.webkitSpeechRecognition;if(!SR){status.textContent='Speech recognition is not supported in this browser. Try a supported browser or use the keyboard microphone.';return}let rec=new SR();rec.interimResults=true;rec.continuous=false;rec.lang=navigator.language||'en-US';status.textContent='Listening… speak now.';rec.onresult=e=>{let text=Array.from(e.results).map(r=>r[0].transcript).join('');target.value=(target.value?target.value+' ':'')+text};rec.onerror=e=>status.textContent='Voice recognition error: '+e.error;rec.onend=()=>{if(status)status.textContent='Transcription ready. Review and edit before saving.'};rec.start()}
 function startVoiceAll(){let SR=window.SpeechRecognition||window.webkitSpeechRecognition;if(!SR){alert('Speech recognition is not supported in this browser. You can use your phone keyboard microphone, or open the app in a supported browser.');return}let prompt='Voice logging: say the jump details naturally. When you finish, the transcript will be placed in Private Notes. This prototype does not yet use an AI extraction service to map every spoken value into fields.';if(!confirm(prompt+' Continue?'))return;let f=document.getElementById('jumpForm');startDictation(f.elements.privateNotes,document.getElementById('voiceStatus'));f.elements.privateNotes.scrollIntoView({behavior:'smooth',block:'center'})}
 render();
+window.getLocalSnapshot=()=>({jumps:db.jumps.map(({media,...j})=>j),objects:db.objects,gears:db.gears,options:db.options,settings:db.settings});
+window.setCloudSnapshot=x=>{if(!x||!Array.isArray(x.jumps)||!Array.isArray(x.objects)||!Array.isArray(x.gears))throw Error('Invalid cloud snapshot');db={...structuredClone(defaults),...x};persist();render()};
+</script>
+<div id="authGate" style="position:fixed;inset:0;background:#101116f5;z-index:20;display:flex;align-items:center;justify-content:center;padding:20px">
+  <section class="section" style="width:min(100%,420px);padding:22px">
+    <div class="eyebrow">PRIVATE CLOUD ACCOUNT</div><h1 style="font-size:24px;margin:5px 0 8px">Your BASE logbook</h1>
+    <p class="muted small">Sign in to keep your jumps private and synchronized across devices.</p>
+    <div class="field" style="margin:14px 0"><label for="authName">Name (for new account)</label><input id="authName" autocomplete="name" placeholder="Your name"></div>
+    <div class="field" style="margin:14px 0"><label for="authEmail">Email</label><input id="authEmail" type="email" autocomplete="email" placeholder="you@example.com"></div>
+    <div class="field" style="margin:14px 0"><label for="authPassword">Password</label><input id="authPassword" type="password" autocomplete="current-password" placeholder="At least 8 characters"></div>
+    <button class="primary" id="authSubmit" style="width:100%">Sign in</button>
+    <button class="secondary" id="authToggle" style="width:100%;margin-top:8px">Create an account</button>
+    <div id="authError" class="status" role="alert"></div>
+    <div class="footerhint" style="margin-top:14px">Your BASE jump records are sensitive. Use a unique password and never share your account.</div>
+  </section>
+</div>
+<script type="module">
+import { createAuthClient } from 'https://esm.sh/@neondatabase/auth';
+const AUTH_URL='https://ep-young-truth-badvxgct.neonauth.c-8.eu-central-1.aws.neon.tech/neondb/auth';
+const auth=createAuthClient(AUTH_URL);
+const gate=document.getElementById('authGate'), errorBox=document.getElementById('authError'), submit=document.getElementById('authSubmit'), toggle=document.getElementById('authToggle'), status=document.getElementById('authStatus');
+let creating=false, cloudReady=false, syncBusy=false, syncAgain=false, bearer=null;
+function showError(e){errorBox.textContent=e?.message||String(e)||'Authentication failed.'}
+async function getToken(){
+  const r=await auth.token();
+  const token=r?.data?.token||r?.token;
+  if(!token)throw Error('Could not obtain a secure access token. Please sign in again.');
+  return token;
+}
+async function api(path,opts={}){
+  const response=await fetch(path,{...opts,headers:{'Content-Type':'application/json',Authorization:'Bearer '+bearer,...opts.headers}});
+  const data=await response.json().catch(()=>({}));
+  if(!response.ok)throw Error(data.error||'Cloud request failed ('+response.status+').');
+  return data;
+}
+async function syncCloud(){
+  if(!cloudReady||!bearer)return;
+  if(syncBusy){syncAgain=true;return}
+  syncBusy=true;
+  try{
+    const snapshot=window.getLocalSnapshot();
+    await api('/api/snapshot',{method:'PUT',body:JSON.stringify(snapshot)});
+    status.textContent='Cloud sync active · '+new Date().toLocaleTimeString();
+  }catch(e){status.textContent='Cloud sync issue · '+e.message}
+  finally{syncBusy=false;if(syncAgain){syncAgain=false;syncCloud()}}
+}
+window.cloudSync=()=>{if(cloudReady)syncCloud()};
+async function enterApp(){
+  const session=await auth.getSession();
+  if(!session?.data?.user&&!session?.user)throw Error('No active session.');
+  bearer=await getToken();
+  await api('/api/me');
+  const cloud=await api('/api/snapshot');
+  if(cloud.snapshot){
+    const local=window.getLocalSnapshot();
+    const localHasData=local.jumps.length||local.objects.length||local.gears.length;
+    if(localHasData&&!confirm('A cloud logbook already exists. Replace this device’s local records with the cloud copy?')){gate.style.display='none';cloudReady=true;await syncCloud();return}
+    window.setCloudSnapshot(cloud.snapshot);
+  }else{
+    await api('/api/snapshot',{method:'PUT',body:JSON.stringify(window.getLocalSnapshot())});
+  }
+  cloudReady=true;gate.style.display='none';
+  const email=session.data?.user?.email||session.user?.email||'Signed in';
+  status.textContent='Cloud sync active · '+email;
+}
+submit.onclick=async()=>{
+  submit.disabled=true;errorBox.textContent='';
+  try{
+    const email=document.getElementById('authEmail').value.trim(),password=document.getElementById('authPassword').value,name=document.getElementById('authName').value.trim();
+    if(!email||!password)throw Error('Enter your email and password.');
+    const result=creating?await auth.signUp.email({email,password,name:name||email.split('@')[0]}):await auth.signIn.email({email,password});
+    if(result?.error)throw Error(result.error.message||'Authentication failed.');
+    await enterApp();
+  }catch(e){showError(e)}finally{submit.disabled=false}
+};
+toggle.onclick=()=>{creating=!creating;document.getElementById('authName').parentElement.style.display=creating?'block':'none';submit.textContent=creating?'Create account':'Sign in';toggle.textContent=creating?'I already have an account':'Create an account';document.getElementById('authPassword').autocomplete=creating?'new-password':'current-password';errorBox.textContent=''};
+document.getElementById('authName').parentElement.style.display='none';
+document.getElementById('authPassword').addEventListener('keydown',e=>{if(e.key==='Enter')submit.click()});
+(async()=>{try{await enterApp()}catch(e){status.textContent='Sign in required';gate.style.display='flex';if(!/No active session/.test(e.message))showError(e)}})();
 </script></body></html>
