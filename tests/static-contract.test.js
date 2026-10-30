@@ -161,7 +161,7 @@ test('FlySight import estimates deployment delay and altitude loss for review', 
   assert.match(ui, /delaySeconds/);
   assert.match(ui, /altitudeLossMeters/);
   assert.match(ui, /openingAltitudeLoss/);
-  assert.match(ui, /Apply estimated opening delay and altitude loss/);
+  assert.match(ui, /verify the estimated opening values/);
   assert.match(ui, /confidence/);
 });
 
@@ -187,7 +187,41 @@ test('FlySight import auto-fills opening metrics before remaining jump details',
 test('FlySight 2 native multi-line TRACK.CSV headers and sensor rows are supported', () => {
   assert.match(ui, /startsWith\('\$FLYS'\)/);
   assert.match(ui, /findIndex\(x=>x\.trim\(\)==='\$DATA'\)/);
-  assert.match(ui, /a\[0\]===\('\$'\+sensor\)/);
+  assert.match(ui, /a\[0\]!==\('\
+  assert.match(ui, /\['GNSS','GPS','TRACK'\]/);
+  assert.match(ui, /function splitCsvLine\(line\)/);
+});
+
+test('FlySight import reverse-geocodes GPS coordinates into country field', () => {
+  assert.match(ui, /api\/geocode\/reverse\?lat=/);
+  assert.match(ui, /Authorization:'Bearer '\+bearer/);
+  assert.match(ui, /if\(place\.country&&!form\.elements\.country\.value\.trim\(\)\)\{form\.elements\.country\.value=place\.country/);
+});
+test('FlySight 2 vertical velocity sign is normalized for descent detection', () => {
+  assert.match(ui, /Number\.isFinite\(p\.velD\)\?-p\.velD/);
+});
+test('Reverse geocoding is authenticated and validates coordinates', () => {
+  assert.match(server, /app\.get\('\/api\/geocode\/reverse', requireUser/);
+  assert.match(server, /Math\.abs\(latitude\)>90/);
+  assert.match(server, /address\?\.country/);
+});
+
+test('FlySight 2 SENSOR.CSV imports sensor schemas, units, variables and samples', () => {
+  assert.match(ui, /function parseFlySightSensorCsv\(raw\)/);
+  assert.match(ui, /a\[0\]==='\$COL'/);
+  assert.match(ui, /a\[0\]==='\$UNIT'/);
+  assert.match(ui, /a\[0\]==='\$VAR'/);
+  assert.match(ui, /sensor\.samples\+\+/);
+  assert.match(ui, /m\.min=Math\.min\(m\.min,n\)/);
+  assert.match(ui, /m\.average=m\.count\?m\.sum\/m\.count:null/);
+  assert.match(ui, /name==='SENSOR\.CSV'\|\|name\.includes\('SENSOR'\)/);
+});
+test('FlySight import accepts TRACK and SENSOR files together', () => {
+  assert.match(ui, /id="flySight" type="file" accept="\.gpx,\.csv" multiple/);
+  assert.match(ui, /trackDraft\.sensorData\?'<div class=/);
+  assert.match(ui, /Sensor files imported:/);
+});
+\+sensor\)/);
   assert.match(ui, /\['GNSS','GPS','TRACK'\]/);
   assert.match(ui, /function splitCsvLine\(line\)/);
 });
