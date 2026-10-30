@@ -291,6 +291,11 @@ test('FlySight handoff uses short-lived hashed upload tokens and bounded chunk s
 });
 
 
+test('FlySight handoff uploads lock and revalidate the token row before enforcing the two-file limit', () => {
+  assert.match(server, /lockedSession=await client\.query\([\s\S]*FOR UPDATE/);
+  assert.match(server, /if\(!lockedSession\.rowCount\)[\s\S]*Handoff token is invalid or expired/);
+});
+
 test('native FlySight uploader uses HTTPS, bounded chunks and the scoped handoff token', () => {
   assert.match(nativeFlySight, /scheme == "https"/);
   assert.match(nativeFlySight, /256 \* 1024/);
