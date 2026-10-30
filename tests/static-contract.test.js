@@ -187,7 +187,7 @@ test('FlySight import auto-fills opening metrics before remaining jump details',
 test('FlySight 2 native multi-line TRACK.CSV headers and sensor rows are supported', () => {
   assert.match(ui, /startsWith\('\$FLYS'\)/);
   assert.match(ui, /findIndex\(x=>x\.trim\(\)==='\$DATA'\)/);
-  assert.match(ui, /a\\[0\\]!==/);
+  assert.match(ui, /a\[0\]!==/);
   assert.match(ui, /\['GNSS','GPS','TRACK'\]/);
   assert.match(ui, /function splitCsvLine\(line\)/);
 });
