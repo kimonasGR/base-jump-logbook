@@ -260,3 +260,15 @@ test('FlySight imports retain source-file provenance and SHA-256 fingerprints', 
   assert.match(ui, /Source files:/);
   assert.match(ui, /existingIndex=sourceFiles\.findIndex\(x=>x\.kind===incoming\.kind\)/);
 });
+
+
+const nativeBLE = await readFile(new URL('../native/ios/FlySightBLEClient.swift', import.meta.url), 'utf8');
+
+test('FlySight downloads enforce import-size and transfer-integrity limits', () => {
+  assert.ok(nativeBLE.includes('maximumImportFileSize = 15 * 1024 * 1024'));
+  assert.ok(nativeBLE.includes('guard !transferIsActive'));
+  assert.ok(nativeBLE.includes('expectedSize <= UInt32(maximumImportFileSize)'));
+  assert.ok(nativeBLE.includes('nextSize <= maximumImportFileSize'));
+  assert.ok(nativeBLE.includes('FileTransferError.sizeMismatch'));
+  assert.ok(nativeBLE.includes('FileTransferError.transferInProgress'));
+});
