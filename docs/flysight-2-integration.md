@@ -25,7 +25,7 @@ Based on the FlySight 2 firmware BLE developer documentation:
 5. Read a file using command `0x02`, little-endian zero offset and stride multipliers, and a null-terminated path.
 6. For every `0x10` data packet, append its payload and return `0x12` plus the packet counter. A packet with no data bytes marks EOF; it is acknowledged too.
 7. Treat `0xf0` as command rejection and `0xf1` as command acknowledgement. The prototype also applies a 30-second transfer timeout and supports `0xff` cancellation.
-8. Save downloaded files in the app's Documents directory and expose them through the iOS share sheet. The source files on the FlySight are never modified or deleted.
+8. Save downloaded files in the app's Documents directory. The native screen lets the user select `TRACK.CSV` and `SENSOR.CSV` together and share both files in one share-sheet action. The user then selects both in the web logbook's existing multi-file import control. The source files on the FlySight are never modified or deleted.
 
 The protocol documentation specifies Go-Back-N with a window of eight packets and 242-byte frames. The client now tracks sequential receive counters, re-acknowledges the immediately previous duplicate without appending it twice, leaves out-of-order packets unacknowledged, and sends a 15-second keep-alive. This is not yet a proven full Go-Back-N implementation: counter wrap, older duplicates, retransmission timing, negotiated MTU edge cases, and long-transfer reliability still require validation against hardware and firmware.
 
@@ -35,7 +35,7 @@ The protocol documentation specifies Go-Back-N with a window of eight packets an
 2. User switches the FlySight to Idle mode (LED off).
 3. App lists the device directory and user selects `TRACK.CSV` and `SENSOR.CSV`.
 4. App downloads the files without modifying or deleting the originals.
-5. The downloaded files are shared to the web logbook's existing file import UI; direct in-app handoff into the web app remains to be implemented.
+5. The downloaded files are selected together and shared from iOS; the user completes the handoff by choosing both files in the web logbook's existing file import UI. A zero-touch direct handoff into an authenticated web session remains to be implemented.
 6. The user reviews the track and sensor summaries before attaching them to a jump.
 
 ## Known gaps before release
