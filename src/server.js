@@ -17,7 +17,7 @@ const jwks = jwksUrl ? createRemoteJWKSet(new URL(jwksUrl)) : null;
 app.disable('x-powered-by');
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
 app.use(cors({ origin: process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(',').map(s => s.trim()) : false, credentials: true }));
-app.use(express.json({ limit: '1mb' }));
+app.use(express.json({ limit: '5mb' }));
 
 const asyncRoute = fn => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 
@@ -85,6 +85,18 @@ app.post('/api/voice/extract', requireUser, upload.single('audio'), asyncRoute(a
   const draft=JSON.parse(outputText); draft.transcript=transcript;
   // Intentionally return a draft only. This endpoint never writes a jump to the database.
   res.json({draft,requiresConfirmation:true,storedAudio:false});
+}));
+
+
+const snapshotSchema = z.object({ jumps: z.array(z.record(z.string(), z.unknown())).max(10000), objects: z.array(z.record(z.string(), z.unknown())).max(5000), gears: z.array(z.record(z.string(), z.unknown())).max(5000), options: z.record(z.string(), z.array(z.string())).optional(), settings: z.record(z.string(), z.unknown()).optional() }).strict();
+app.get('/api/snapshot', requireUser, asyncRoute(async (req,res) => {
+  const r = await pool.query('SELECT payload, updated_at FROM user_snapshots WHERE user_id=$1', [req.user.id]);
+  res.json({ snapshot: r.rows[0]?.payload || null, updatedAt: r.rows[0]?.updated_at || null });
+}));
+app.put('/api/snapshot', requireUser, asyncRoute(async (req,res) => {
+  const snapshot = snapshotSchema.parse(req.body);
+  const r = await pool.query('INSERT INTO user_snapshots(user_id,payload,updated_at) VALUES($1,$2::jsonb,now()) ON CONFLICT(user_id) DO UPDATE SET payload=EXCLUDED.payload,updated_at=now() RETURNING updated_at', [req.user.id, JSON.stringify(snapshot)]);
+  res.json({ ok:true, updatedAt:r.rows[0].updated_at });
 }));
 
 app.use((err, _req, res, _next) => {
