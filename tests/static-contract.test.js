@@ -184,3 +184,17 @@ test('FlySight 2 native multi-line TRACK.CSV headers and sensor rows are support
   assert.match(ui, /\['GNSS','GPS','TRACK'\]/);
   assert.match(ui, /function splitCsvLine\(line\)/);
 });
+
+test('FlySight import reverse-geocodes GPS coordinates into country field', () => {
+  assert.match(ui, /api\\/geocode\\/reverse\\?lat=/);
+  assert.match(ui, /Authorization:'Bearer '\+bearer/);
+  assert.match(ui, /if\(place\.country&&!form\.elements\.country\.value\.trim\(\)\)\{form\.elements\.country\.value=place\.country/);
+});
+test('FlySight 2 vertical velocity sign is normalized for descent detection', () => {
+  assert.match(ui, /Number\.isFinite\(p\.velD\)\?-p\.velD/);
+});
+test('Reverse geocoding is authenticated and validates coordinates', () => {
+  assert.match(server, /app\.get\('\/api\/geocode\/reverse', requireUser/);
+  assert.match(server, /Math\.abs\(latitude\)>90/);
+  assert.match(server, /address\?\.country/);
+});
