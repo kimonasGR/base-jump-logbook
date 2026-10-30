@@ -55,3 +55,10 @@ The protocol documentation specifies Go-Back-N with a window of eight packets an
 - Preserve original source files or a recoverable copy before transformations.
 - Clearly distinguish imported measurements from calculated estimates.
 - Do not claim live IMU/barometer/magnetometer streaming until those data channels and their firmware support have been verified on a real device.
+
+
+## Secure native-to-web handoff foundation
+
+The API now supports short-lived (10-minute), random upload-only handoff tokens. Only a SHA-256 digest is stored in PostgreSQL; the token itself is returned once to the authenticated browser and is never a Neon Auth credential. The native uploader can send only TRACK.CSV, SENSOR.CSV or TRACK.GPX, split into 256 KiB chunks, with a 15 MiB per-file ceiling and declared SHA-256 metadata. The authenticated web account can list completed files and retrieve individual chunks; every read is scoped to the owning user. Expired sessions and files cascade-delete through the migration schema.
+
+Apply `migrations/002_flysight_handoff.sql` to the existing Neon database before enabling this flow. The current web and iOS screens still use the manual share-sheet path until their token pairing, chunk upload, and import-inbox UI are connected.
