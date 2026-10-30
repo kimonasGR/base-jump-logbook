@@ -132,6 +132,23 @@ test('frontend pauses cloud sync on conflict and tracks the acknowledged cloud v
   assert.match(ui, /cloudReady=false;syncAgain=false;status\.textContent='Sync paused/);
 });
 
+test('HTML contains one application shell and one Neon Auth bootstrap', () => {
+  assert.equal((ui.match(/id="authGate"/g) || []).length, 1);
+  assert.equal((ui.match(/const AUTH_URL=/g) || []).length, 1);
+  assert.equal((ui.match(/<script/g) || []).length, 2);
+  assert.equal((ui.match(/<\/script>/g) || []).length, 2);
+  assert.ok(ui.endsWith('</body></html>\n'));
+});
+
+test('cloud sync retries transient failures and waits for reconnection while offline', () => {
+  assert.match(ui, /function scheduleCloudRetry\(\)/);
+  assert.match(ui, /Math\.min\(60000,1000\*\(2\*\*Math\.min\(syncRetryAttempt,6\)\)\)/);
+  assert.match(ui, /navigator\.onLine===false/);
+  assert.match(ui, /addEventListener\('online'/);
+  assert.match(ui, /error\.status=response\.status;error\.code=data\.code/);
+  assert.match(ui, /e\.status===408\|\|e\.status===429\|\|e\.status>=500/);
+});
+
 test('local data is backed up before a cloud restore can replace it', () => {
   assert.match(ui, /window\.createLocalRecoveryBackup=\(\)=>/);
   assert.match(ui, /baseLogbookRecoveryBackups\.v1/);
