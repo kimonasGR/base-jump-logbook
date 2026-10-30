@@ -4,7 +4,7 @@ Private, mobile-first BASE jumping logbook.
 
 ## Status
 
-The repository contains a private web logbook prototype with authenticated API routes, account-scoped cloud snapshot sync, local recovery backups, and FlySight GPX/CSV import. It is **not yet production-ready**. Native iOS Bluetooth source includes device discovery, telemetry, a basic directory/file-read flow, packet sequencing, and transfer keep-alive. It remains a prototype: no installable Xcode project or physical-device validation yet.
+The repository contains a private web logbook prototype with authenticated API routes, account-scoped cloud snapshot sync, local recovery backups, and FlySight GPX/CSV import. It is **not yet production-ready**. Native iOS Bluetooth source includes device discovery, telemetry, a basic directory/file-read flow, packet sequencing, and transfer keep-alive. It remains a prototype: the XcodeGen project builds for iOS Simulator, but has not been signed, installed on a physical iPhone, or validated with a FlySight device.
 
 Photos and videos remain local to the device. Imported FlySight track and sensor summaries are included in the cloud-synced jump record.
 
@@ -34,7 +34,7 @@ Native iOS prototype source is in `native/ios/`:
 - `FlySightBLEClient.swift`: CoreBluetooth discovery, secure connection setup, battery/mode reads, GNSS notifications, device directory listing and CSV file downloads.
 - `Info.plist.fragment`: Bluetooth privacy usage description to merge into the app's Info.plist.
 
-An XcodeGen project definition is provided at `native/ios/project.yml`; generate the `.xcodeproj` with `brew install xcodegen && cd native/ios && xcodegen generate`. GitHub Actions builds the generated app for the iOS Simulator. The current file-transfer prototype lists device files and downloads selected files to the app's Documents directory; it does not modify or delete files on the FlySight. Go-Back-N receive sequencing and 15-second keep-alive are implemented, but retransmission behavior, MTU edge cases, interrupted transfers, and physical-device compatibility still require testing. The iOS Swift source is type-checked in GitHub Actions. See [the integration plan](docs/flysight-2-integration.md).
+An XcodeGen project definition is provided at `native/ios/project.yml`; generate the `.xcodeproj` with `brew install xcodegen && cd native/ios && xcodegen generate`. GitHub Actions builds the generated app for the iOS Simulator. The current file-transfer prototype lists device files and downloads selected files to the app's Documents directory; it can share `TRACK.CSV` and `SENSOR.CSV` together to the web import flow. Imported source files are fingerprinted with SHA-256 for provenance and duplicate-source recognition. The app does not modify or delete files on the FlySight. Go-Back-N receive sequencing and 15-second keep-alive are implemented, but retransmission behavior, MTU edge cases, interrupted transfers, and physical-device compatibility still require testing. The iOS Swift source is type-checked in GitHub Actions. See [the integration plan](docs/flysight-2-integration.md).
 
 ## Quality checks
 
