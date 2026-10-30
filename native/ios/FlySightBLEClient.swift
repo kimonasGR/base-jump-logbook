@@ -41,7 +41,7 @@ final class FlySightBLEClient: NSObject, ObservableObject {
     }
 
     enum FileTransferError: LocalizedError {
-        case notConnected, idleModeRequired, missingCharacteristic, malformedPacket, deviceRejected(UInt8), timedOut, cancelled
+        case notConnected, idleModeRequired, missingCharacteristic, malformedPacket, deviceRejected(UInt8), timedOut, cancelled, transferInProgress, fileTooLarge, sizeMismatch
         var errorDescription: String? {
             switch self {
             case .notConnected: return "Connect to FlySight 2 first."
@@ -51,6 +51,9 @@ final class FlySightBLEClient: NSObject, ObservableObject {
             case .deviceRejected(let command): return String(format: "FlySight rejected file-transfer command 0x%02X.", command)
             case .timedOut: return "FlySight file transfer timed out."
             case .cancelled: return "File transfer was cancelled."
+            case .transferInProgress: return "Another FlySight file operation is already in progress."
+            case .fileTooLarge: return "This file exceeds the 15 MB import limit."
+            case .sizeMismatch: return "Downloaded file size does not match the directory listing."
             }
         }
     }
@@ -86,6 +89,7 @@ final class FlySightBLEClient: NSObject, ObservableObject {
     private var keepAliveTask: Task<Void, Never>?
     private var expectedDownloadCounter: UInt8?
     private var lastAcknowledgedCounter: UInt8?
+    private let maximumImportFileSize = 15 * 1024 * 1024
 
     override init() {
         super.init()
@@ -119,6 +123,7 @@ final class FlySightBLEClient: NSObject, ObservableObject {
     /// Lists a device directory. Must be called while FlySight is in Idle mode.
     func listDirectory(path: String = "/", completion: @escaping (Result<[FlySightFile], Error>) -> Void) {
         guard state == .connected, peripheral != nil else { completion(.failure(FileTransferError.notConnected)); return }
+        guard !transferIsActive else { completion(.failure(FileTransferError.transferInProgress)); return }
         guard deviceMode == 0 else { completion(.failure(FileTransferError.idleModeRequired)); return }
         guard let tx = characteristics[filePacketIn], characteristics[filePacketOut] != nil else { completion(.failure(FileTransferError.missingCharacteristic)); return }
         directoryEntries = []
@@ -131,7 +136,9 @@ final class FlySightBLEClient: NSObject, ObservableObject {
     /// Reads a file without modifying or deleting the source on the FlySight.
     func downloadFile(path: String, expectedSize: UInt32 = 0, completion: @escaping (Result<Data, Error>) -> Void) {
         guard state == .connected, peripheral != nil else { completion(.failure(FileTransferError.notConnected)); return }
+        guard !transferIsActive else { completion(.failure(FileTransferError.transferInProgress)); return }
         guard deviceMode == 0 else { completion(.failure(FileTransferError.idleModeRequired)); return }
+        guard expectedSize <= UInt32(maximumImportFileSize) else { completion(.failure(FileTransferError.fileTooLarge)); return }
         guard let tx = characteristics[filePacketIn], characteristics[filePacketOut] != nil else { completion(.failure(FileTransferError.missingCharacteristic)); return }
         downloadBuffer = Data()
         expectedDownloadCounter = nil
@@ -273,13 +280,20 @@ final class FlySightBLEClient: NSObject, ObservableObject {
             if data.count == 2 {
                 let result = downloadBuffer
                 if downloadExpectedSize > 0 && UInt32(result.count) != downloadExpectedSize {
-                    finishTransfer(.failure(FileTransferError.malformedPacket))
+                    finishTransfer(.failure(FileTransferError.sizeMismatch))
                 } else {
                     finishTransfer(.success(result))
                 }
                 return
             }
-            downloadBuffer.append(data.subdata(in: 2..<data.count))
+            let payload = data.subdata(in: 2..<data.count)
+            let nextSize = downloadBuffer.count + payload.count
+            guard nextSize <= maximumImportFileSize,
+                  downloadExpectedSize == 0 || nextSize <= Int(downloadExpectedSize) else {
+                finishTransfer(.failure(FileTransferError.fileTooLarge))
+                return
+            }
+            downloadBuffer.append(payload)
             if downloadExpectedSize > 0 {
                 transferProgress = min(1, Double(downloadBuffer.count) / Double(downloadExpectedSize))
             }
