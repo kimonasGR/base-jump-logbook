@@ -212,9 +212,10 @@ test('FlySight 2 native multi-line TRACK.CSV headers and sensor rows are support
 });
 
 test('FlySight import reverse-geocodes GPS coordinates into country field', () => {
-  assert.match(ui, /api\/geocode\/reverse\?lat=/);
+  assert.match(ui, /window\.lookupCountry=async\(latitude,longitude\)=>/);
+  assert.match(ui, /const place=await window\.lookupCountry\?\.\(points\[0\]\.lat,points\[0\]\.lon\)/);
   assert.match(ui, /Authorization:'Bearer '\+bearer/);
-  assert.match(ui, /if\(place\.country&&!form\.elements\.country\.value\.trim\(\)\)\{form\.elements\.country\.value=place\.country/);
+  assert.match(ui, /if\(place&&!form\.elements\.country\.value\.trim\(\)\)\{form\.elements\.country\.value=place/);
 });
 test('FlySight 2 vertical velocity sign is normalized for descent detection', () => {
   assert.match(ui, /Number\.isFinite\(p\.velD\)\?-p\.velD/);
@@ -242,9 +243,10 @@ test('FlySight import accepts TRACK and SENSOR files together', () => {
 });
 
 test('FlySight import reverse-geocodes GPS coordinates into country field', () => {
-  assert.match(ui, /api\/geocode\/reverse\?lat=/);
+  assert.match(ui, /window\.lookupCountry=async\(latitude,longitude\)=>/);
+  assert.match(ui, /const place=await window\.lookupCountry\?\.\(points\[0\]\.lat,points\[0\]\.lon\)/);
   assert.match(ui, /Authorization:'Bearer '\+bearer/);
-  assert.match(ui, /if\(place\.country&&!form\.elements\.country\.value\.trim\(\)\)\{form\.elements\.country\.value=place\.country/);
+  assert.match(ui, /if\(place&&!form\.elements\.country\.value\.trim\(\)\)\{form\.elements\.country\.value=place/);
 });
 test('FlySight 2 vertical velocity sign is normalized for descent detection', () => {
   assert.match(ui, /Number\.isFinite\(p\.velD\)\?-p\.velD/);
