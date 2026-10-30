@@ -1,5 +1,7 @@
 import express from 'express';
-import { createHash, randomBytes } from 'node:crypto';
+import { createHash, randomBytes, randomUUID } from 'node:crypto';
+import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import helmet from 'helmet';
 import cors from 'cors';
 import multer from 'multer';
@@ -12,8 +14,12 @@ const app = express();
 const port = Number(process.env.PORT || 8787);
 const pool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: true } : { rejectUnauthorized: false }, max: 10, idleTimeoutMillis: 30_000, connectionTimeoutMillis: 8_000 });
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024, files: 1 }, fileFilter: (_req, file, cb) => cb(null, /^(audio\/(webm|wav|mpeg|mp4|ogg|mpga|m4a|x-m4a)|video\/webm)$/.test(file.mimetype)) });
+const mediaUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 3 * 1024 * 1024, files: 1 }, fileFilter: (_req, file, cb) => cb(null, /^(image\/(jpeg|png|webp|gif|heic|heif|avif)|video\/(mp4|quicktime|webm|3gpp|x-m4v))$/.test(file.mimetype)) });
 const jwksUrl = process.env.NEON_AUTH_JWKS_URL;
 const jwks = jwksUrl ? createRemoteJWKSet(new URL(jwksUrl)) : null;
+const mediaBucket = process.env.NEON_STORAGE_BUCKET || 'base-jump-media';
+const mediaStorageConfigured = Boolean(process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY && process.env.AWS_ENDPOINT_URL_S3 && process.env.AWS_REGION);
+const s3 = mediaStorageConfigured ? new S3Client({ region: process.env.AWS_REGION, endpoint: process.env.AWS_ENDPOINT_URL_S3, forcePathStyle: true, credentials: { accessKeyId: process.env.AWS_ACCESS_KEY_ID, secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY } }) : null;
 
 app.disable('x-powered-by');
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
@@ -51,8 +57,53 @@ async function requireUser(req, res, next) {
   }
 }
 
-app.get('/api/health', (_req, res) => res.json({ ok: true, service: 'base-jump-logbook-api', voiceExtraction: Boolean(process.env.OPENAI_API_KEY), authConfigured: Boolean(jwks) }));
+app.get('/api/health', (_req, res) => res.json({ ok: true, service: 'base-jump-logbook-api', voiceExtraction: Boolean(process.env.OPENAI_API_KEY), authConfigured: Boolean(jwks), mediaStorageConfigured }));
 app.get('/api/me', requireUser, (req, res) => res.json({ userId: req.user.id }));
+
+const mediaIdSchema = z.string().uuid();
+const mediaJumpKeySchema = z.string().trim().min(1).max(100).regex(/^[A-Za-z0-9._-]+$/);
+app.post('/api/media', requireUser, mediaUpload.single('file'), asyncRoute(async (req,res) => {
+  if (!s3) return res.status(503).json({ error:'Private media storage is not configured. Set the Neon S3 credentials on the API deployment.', code:'MEDIA_STORAGE_NOT_CONFIGURED' });
+  if (!req.file) return res.status(400).json({ error:'Choose one supported photo or video file.' });
+  const jumpKey=mediaJumpKeySchema.parse(req.body.jumpId);
+  const mediaId=randomUUID();
+  const fileName=String(req.file.originalname||'attachment').split(/[\\/]/).pop().replace(/[\u0000-\u001f]/g,'_').slice(0,180)||'attachment';
+  const mediaType=req.file.mimetype.startsWith('video/')?'video':'photo';
+  const ownerHash=createHash('sha256').update(req.user.id).digest('hex');
+  const storageKey='users/'+ownerHash+'/jumps/'+jumpKey+'/'+mediaId;
+  await s3.send(new PutObjectCommand({Bucket:mediaBucket,Key:storageKey,Body:req.file.buffer,ContentType:req.file.mimetype,Metadata:{owner:ownerHash,jump:jumpKey}}));
+  try {
+    const saved=await pool.query(
+      'INSERT INTO user_media(id,user_id,jump_key,storage_key,file_name,mime_type,media_type,size_bytes) VALUES($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id,file_name,mime_type,media_type,size_bytes,created_at',
+      [mediaId,req.user.id,jumpKey,storageKey,fileName,req.file.mimetype,mediaType,req.file.size]
+    );
+    const row=saved.rows[0];
+    res.status(201).json({storageId:row.id,name:row.file_name,type:row.mime_type,sizeBytes:Number(row.size_bytes),createdAt:row.created_at});
+  } catch(error) {
+    await s3.send(new DeleteObjectCommand({Bucket:mediaBucket,Key:storageKey})).catch(()=>{});
+    throw error;
+  }
+}));
+app.get('/api/media/:id/url', requireUser, asyncRoute(async (req,res) => {
+  if (!s3) return res.status(503).json({error:'Private media storage is not configured.',code:'MEDIA_STORAGE_NOT_CONFIGURED'});
+  const id=mediaIdSchema.parse(req.params.id);
+  const found=await pool.query('SELECT storage_key,file_name,mime_type FROM user_media WHERE id=$1 AND user_id=$2',[id,req.user.id]);
+  if(!found.rowCount)return res.status(404).json({error:'Media not found.'});
+  const row=found.rows[0];
+  const url=await getSignedUrl(s3,new GetObjectCommand({Bucket:mediaBucket,Key:row.storage_key,ResponseContentType:row.mime_type,ResponseContentDisposition:'inline; filename="'+row.file_name.replace(/["\r\n]/g,'_')+'"'}),{expiresIn:900});
+  res.set('Cache-Control','private, no-store');
+  res.json({url,expiresIn:900});
+}));
+app.delete('/api/media/:id', requireUser, asyncRoute(async (req,res) => {
+  if (!s3) return res.status(503).json({error:'Private media storage is not configured.',code:'MEDIA_STORAGE_NOT_CONFIGURED'});
+  const id=mediaIdSchema.parse(req.params.id);
+  const found=await pool.query('SELECT storage_key FROM user_media WHERE id=$1 AND user_id=$2',[id,req.user.id]);
+  if(!found.rowCount)return res.status(404).json({error:'Media not found.'});
+  await s3.send(new DeleteObjectCommand({Bucket:mediaBucket,Key:found.rows[0].storage_key}));
+  await pool.query('DELETE FROM user_media WHERE id=$1 AND user_id=$2',[id,req.user.id]);
+  res.status(204).end();
+}));
+
 app.get('/api/geocode/reverse', requireUser, asyncRoute(async (req,res) => {
   const latitude=Number(req.query.lat),longitude=Number(req.query.lon);
   if(!Number.isFinite(latitude)||Math.abs(latitude)>90||!Number.isFinite(longitude)||Math.abs(longitude)>180) return res.status(400).json({error:'Valid latitude and longitude are required.'});
@@ -242,7 +293,8 @@ app.put('/api/snapshot', requireUser, asyncRoute(async (req,res) => {
 
 app.use((err, _req, res, _next) => {
   if (err instanceof z.ZodError) return res.status(400).json({error:'Validation failed.', details:err.issues.map(i=>({field:i.path.join('.'),message:i.message}))});
-  if (err?.code === 'LIMIT_FILE_SIZE') return res.status(413).json({error:'Audio file must be 20 MB or smaller.'});
+  if (err?.code === 'LIMIT_FILE_SIZE') return res.status(413).json({error:err?.field==='file'?'Photos and videos must be 3 MB or smaller.':'Audio file must be 20 MB or smaller.'});
+  if (err?.code === 'LIMIT_UNEXPECTED_FILE') return res.status(400).json({error:'Upload one file at a time.'});
   console.error(err); res.status(500).json({error:'Unexpected server error.'});
 });
 
