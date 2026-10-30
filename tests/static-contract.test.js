@@ -127,3 +127,11 @@ test('frontend pauses cloud sync on conflict and tracks the acknowledged cloud v
   assert.match(ui, /cloudUpdatedAt=result\.updatedAt/);
   assert.match(ui, /cloudReady=false;syncAgain=false;status\.textContent='Sync paused/);
 });
+
+test('local data is backed up before a cloud restore can replace it', () => {
+  assert.match(ui, /window\.createLocalRecoveryBackup=\(\)=>/);
+  assert.match(ui, /baseLogbookRecoveryBackups\.v1/);
+  assert.match(ui, /backupTime=window\.createLocalRecoveryBackup\(\)/);
+  assert.match(ui, /if\(!confirm\('A cloud logbook already exists/);
+  assert.match(ui, /id="exportRecovery"/);
+});
