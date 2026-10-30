@@ -28,7 +28,7 @@ test('all private data routes require authenticated user middleware', () => {
   ]) assert.ok(server.includes(route), `Missing protected route: ${route}`);
 });
 
-test('database enforces per-user ownership and unique jump numbering', () => {
+test('snapshot cloud sync is authenticated and user-scoped', () => {\n  assert.ok(server.includes("app.get('/api/snapshot', requireUser"));\n  assert.ok(server.includes("app.put('/api/snapshot', requireUser"));\n  assert.match(migration, /CREATE TABLE IF NOT EXISTS user_snapshots/);\n});\n\ntest('database enforces per-user ownership and unique jump numbering', () => {
   assert.match(migration, /UNIQUE\s*\(user_id,\s*jump_number\)/i);
   assert.match(migration, /REFERENCES app_users\(id\) ON DELETE CASCADE/i);
   assert.match(migration, /CHECK\s*\(\(object_type IS DISTINCT FROM 'Other'\)/i);
@@ -44,8 +44,10 @@ test('voice extraction returns a draft and never writes a jump', () => {
 });
 
 test('Vercel catch-all API function and rewrite are configured', () => {
-  assert.equal(vercel.functions['api/[...path].js'].maxDuration, 60);
-  assert.ok(vercel.rewrites.some(r => r.source === '/api/(.*)'));
+  assert.ok(vercel.builds.some(b => b.src === 'public/**' && b.use === '@vercel/static'));
+  assert.ok(vercel.builds.some(b => b.src === 'api/[...path].js' && b.use === '@vercel/node'));
+  assert.ok(vercel.routes.some(r => r.src === '/api/(.*)' && r.dest === '/api/[...path].js'));
+  assert.ok(vercel.routes.some(r => r.src === '/' && r.dest === '/public/index.html'));
 });
 
 test('dangerous values are not committed in the example environment file', async () => {
