@@ -135,7 +135,7 @@ struct FlySightConnectionView: View {
                 do {
                     let folder = try FileManager.default.url(for: .documentDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
                         .appendingPathComponent("FlySight Imports", isDirectory: true)
-                    try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+                    try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true, attributes: nil)
                     let destination = folder.appendingPathComponent(file.name)
                     try data.write(to: destination, options: .atomic)
                     if !downloadedFiles.contains(destination) { downloadedFiles.append(destination) }
