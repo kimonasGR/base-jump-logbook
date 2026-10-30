@@ -26,12 +26,11 @@ async function requireUser(req, res, next) {
     if (!jwks) return res.status(503).json({ error: 'Authentication is not configured. Set NEON_AUTH_JWKS_URL and NEON_AUTH_ISSUER.' });
     const header = req.headers.authorization || '';
     if (!header.startsWith('Bearer ')) return res.status(401).json({ error: 'Sign in required.' });
-    // The Neon Auth JWKS endpoint is project-scoped. Verify the signature,
-    // expiry and standard JWT constraints, but do not pin an issuer URL:
-    // Neon Auth token issuer formats can differ from the auth base URL.
+    // Verify the signature, expiry and configured issuer. If an issuer is
+    // configured, a token from another Neon Auth project must not be accepted.
     let payload;
     try {
-      ({ payload } = await jwtVerify(header.slice(7), jwks));
+      ({ payload } = await jwtVerify(header.slice(7), jwks, process.env.NEON_AUTH_ISSUER ? { issuer: process.env.NEON_AUTH_ISSUER } : {}));
     } catch (e) {
       console.error('Neon Auth JWT verification failed', { name: e?.name, code: e?.code, message: e?.message, issuerConfigured: Boolean(process.env.NEON_AUTH_ISSUER) });
       return res.status(401).json({ error: 'Session token could not be verified.', code: e?.code || 'JWT_INVALID' });
