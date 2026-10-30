@@ -54,3 +54,5 @@ test('dangerous values are not committed in the example environment file', async
   assert.match(env, /OPENAI_API_KEY=$/m);
   assert.doesNotMatch(env, /sk-[A-Za-z0-9]{20,}/);
 });
+
+test('API server module loads without schema construction errors', async () => { process.env.VERCEL = '1'; const server = await import('../src/server.js'); assert.equal(typeof server.default, 'function'); });
