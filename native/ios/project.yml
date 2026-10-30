@@ -1,0 +1,23 @@
+name: BASEJumpLogbook
+options:
+  bundleIdPrefix: com.kimonasgr
+  deploymentTarget:
+    iOS: "17.0"
+targets:
+  BASEJumpLogbook:
+    type: application
+    platform: iOS
+    sources:
+      - path: FlySightLogbookApp.swift
+      - path: FlySightConnectionView.swift
+      - path: FlySightBLEClient.swift
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.kimonasgr.basejumplogbook
+        PRODUCT_NAME: BASE Jump Logbook
+        SWIFT_VERSION: "5.0"
+        TARGETED_DEVICE_FAMILY: "1"
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_NS BluetoothAlwaysUsageDescription: "Connect to your FlySight 2 to import jump tracks and sensor measurements."
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        IPHONEOS_DEPLOYMENT_TARGET: "17.0"
