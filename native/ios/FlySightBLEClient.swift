@@ -83,6 +83,9 @@ final class FlySightBLEClient: NSObject, ObservableObject {
     private var downloadCompletion: ((Result<Data, Error>) -> Void)?
     private var downloadPath: String?
     private var transferTimeout: Task<Void, Never>?
+    private var keepAliveTask: Task<Void, Never>?
+    private var expectedDownloadCounter: UInt8?
+    private var lastAcknowledgedCounter: UInt8?
 
     override init() {
         super.init()
@@ -121,6 +124,7 @@ final class FlySightBLEClient: NSObject, ObservableObject {
         directoryEntries = []
         directoryCompletion = completion
         beginTimeout()
+        beginKeepAlive()
         sendCommand(0x05, path: path, characteristic: tx)
     }
 
@@ -130,12 +134,15 @@ final class FlySightBLEClient: NSObject, ObservableObject {
         guard deviceMode == 0 else { completion(.failure(FileTransferError.idleModeRequired)); return }
         guard let tx = characteristics[filePacketIn], characteristics[filePacketOut] != nil else { completion(.failure(FileTransferError.missingCharacteristic)); return }
         downloadBuffer = Data()
+        expectedDownloadCounter = nil
+        lastAcknowledgedCounter = nil
         downloadExpectedSize = expectedSize
         downloadCompletion = completion
         downloadPath = path
         transferProgress = 0
         transferStatus = "Requesting " + path
         beginTimeout()
+        beginKeepAlive()
         var command = Data([0x02])
         command.append(contentsOf: [UInt8](repeating: 0, count: 8))
         command.append(contentsOf: path.utf8)
@@ -158,6 +165,29 @@ final class FlySightBLEClient: NSObject, ObservableObject {
         peripheral?.writeValue(packet, for: characteristic, type: .withoutResponse)
     }
 
+    private func beginKeepAlive() {
+        keepAliveTask?.cancel()
+        keepAliveTask = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: 15_000_000_000)
+                guard !Task.isCancelled else { return }
+                await MainActor.run { self?.sendKeepAlive() }
+            }
+        }
+    }
+
+    private func sendKeepAlive() {
+        guard transferIsActive, let tx = characteristics[filePacketIn], peripheral != nil else { return }
+        peripheral?.writeValue(Data([0xfe]), for: tx, type: .withoutResponse)
+    }
+
+    private func stopTransferTimers() {
+        transferTimeout?.cancel()
+        transferTimeout = nil
+        keepAliveTask?.cancel()
+        keepAliveTask = nil
+    }
+
     private func beginTimeout() {
         transferTimeout?.cancel()
         transferTimeout = Task { [weak self] in
@@ -168,8 +198,7 @@ final class FlySightBLEClient: NSObject, ObservableObject {
     }
 
     private func finishTransfer(_ result: Result<Data, Error>) {
-        transferTimeout?.cancel()
-        transferTimeout = nil
+        stopTransferTimers()
         if let completion = downloadCompletion {
             let completedPath = downloadPath ?? "file"
             downloadCompletion = nil
@@ -224,10 +253,23 @@ final class FlySightBLEClient: NSObject, ObservableObject {
         case 0x10:
             guard data.count >= 2, downloadCompletion != nil else { return }
             let counter = data[1]
-            let ack = Data([0x12, counter])
-            if let tx = characteristics[filePacketIn] {
-                peripheral?.writeValue(ack, for: tx, type: .withoutResponse)
+            if expectedDownloadCounter == nil { expectedDownloadCounter = counter }
+            if counter == lastAcknowledgedCounter {
+                // Re-acknowledge duplicates without appending their bytes twice.
+                if let tx = characteristics[filePacketIn] {
+                    peripheral?.writeValue(Data([0x12, counter]), for: tx, type: .withoutResponse)
+                }
+                return
             }
+            guard counter == expectedDownloadCounter else {
+                // Leave out-of-order packets unacknowledged; the sender retries from its window base.
+                return
+            }
+            if let tx = characteristics[filePacketIn] {
+                peripheral?.writeValue(Data([0x12, counter]), for: tx, type: .withoutResponse)
+            }
+            lastAcknowledgedCounter = counter
+            expectedDownloadCounter = counter &+ 1
             if data.count == 2 {
                 let result = downloadBuffer
                 if downloadExpectedSize > 0 && UInt32(result.count) != downloadExpectedSize {
