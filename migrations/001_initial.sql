@@ -9,3 +9,5 @@ CREATE INDEX IF NOT EXISTS jumps_user_object_idx ON jumps(user_id, object_id);
 CREATE INDEX IF NOT EXISTS objects_user_name_idx ON objects(user_id, name);
 CREATE INDEX IF NOT EXISTS gear_presets_user_name_idx ON gear_presets(user_id, name);
 CREATE INDEX IF NOT EXISTS jump_media_user_jump_idx ON jump_media(user_id, jump_id);
+
+CREATE TABLE IF NOT EXISTS user_snapshots (user_id TEXT PRIMARY KEY REFERENCES app_users(id) ON DELETE CASCADE, payload JSONB NOT NULL DEFAULT '{}'::jsonb, updated_at TIMESTAMPTZ NOT NULL DEFAULT now());
