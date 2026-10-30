@@ -178,9 +178,8 @@ app.post('/api/flysight/handoffs/upload', asyncRoute(async (req,res) => {
     const complete=count.rows[0].n===v.totalChunks;
     if(complete){
       const stored=await client.query('SELECT data FROM flysight_handoff_chunks WHERE file_id=$1 ORDER BY chunk_index',[file.rows[0].id]);
-      const actual=tokenDigest(Buffer.concat(stored.rows.map(x=>Buffer.from(x.data))).toString('base64'));
-      const expected=tokenDigest(v.sha256.toLowerCase());
-      if(actual!==expected){await client.query('DELETE FROM flysight_handoff_chunks WHERE file_id=$1',[file.rows[0].id]);await client.query('ROLLBACK');return res.status(422).json({error:'Uploaded file failed its SHA-256 integrity check.'});}
+      const actual=createHash('sha256').update(Buffer.concat(stored.rows.map(x=>Buffer.from(x.data)))).digest('hex');
+      if(actual!==v.sha256.toLowerCase()){await client.query('DELETE FROM flysight_handoff_chunks WHERE file_id=$1',[file.rows[0].id]);await client.query('ROLLBACK');return res.status(422).json({error:'Uploaded file failed its SHA-256 integrity check.'});}
       await client.query('UPDATE flysight_handoff_files SET completed_at=now() WHERE id=$1',[file.rows[0].id]);
     }
     await client.query('COMMIT');
