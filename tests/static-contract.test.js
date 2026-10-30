@@ -103,3 +103,10 @@ test('AI voice extraction maps to actual jump form field names', () => {
   assert.match(ui, /opening_direction_degrees:'openingDirection'/);
   assert.match(ui, /id="voiceJumpForm"/);
 });
+
+test('AI draft converts boolean and opening-direction fields to UI option values', () => {
+  assert.match(ui, /key==='off_heading'\|\|key==='correction'/);
+  assert.match(ui, /value\?'Yes':'No'/);
+  assert.match(ui, /opening_direction_degrees==='number'/);
+  assert.match(ui, /new Option\(String\(display\),String\(display\)\)/);
+});
