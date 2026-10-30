@@ -84,5 +84,21 @@ test('cloud restore retains local-only media for matching jump IDs', () => {
 
 test('settings accurately disclose local-only media and current voice limitations', () => {
   assert.match(ui, /Photos, videos and FlySight files are currently stored only on this device/);
-  assert.match(ui, /Voice capture currently transcribes into Private Notes only/);
+  assert.match(ui, /Records audio and sends it to the private AI extraction endpoint/);\n  assert.match(ui, /Nothing is saved until you review and submit the jump/);
+});
+
+test('AI voice draft is wired to the authenticated extraction endpoint', () => {
+  assert.match(ui, /window\.extractVoiceAudio=async\(blob\)/);
+  assert.match(ui, /fetch\('\/api\/voice\/extract'/);
+  assert.match(ui, /form\.append\('audio',blob,'jump-audio\.webm'\)/);
+  assert.match(ui, /AI draft ready/);
+  assert.match(ui, /No jump was saved/);
+});
+
+test('AI voice extraction maps to actual jump form field names', () => {
+  assert.match(ui, /wind_strength:'windStrength'/);
+  assert.match(ui, /beautiful_people_around:'beautifulPeople'/);
+  assert.match(ui, /deployment_method:'deploymentMethod'/);
+  assert.match(ui, /opening_direction_degrees:'openingDirection'/);
+  assert.match(ui, /id="voiceJumpForm"/);
 });
