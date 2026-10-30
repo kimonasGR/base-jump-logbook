@@ -1,4 +1,5 @@
 import SwiftUI
+import CryptoKit
 
 struct FlySightConnectionView: View {
     @StateObject private var bluetooth = FlySightBLEClient()
@@ -8,6 +9,10 @@ struct FlySightConnectionView: View {
     @State private var isListing = false
     @State private var downloadingName: String?
     @State private var transferSaveError: String?
+    @State private var apiBaseURL = ""
+    @State private var handoffToken = ""
+    @State private var uploadStatus = ""
+    @State private var isUploading = false
 
     var body: some View {
         NavigationStack {
@@ -103,6 +108,28 @@ struct FlySightConnectionView: View {
                     }
                 }
 
+                Section("Secure upload to your logbook") {
+                    TextField("Logbook API URL (https://…)", text: $apiBaseURL)
+                        .textInputAutocapitalization(.never)
+                        .keyboardType(.URL)
+                        .autocorrectionDisabled()
+                    SecureField("10-minute handoff token", text: $handoffToken)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                    Button {
+                        Task { await uploadSelectedFiles() }
+                    } label: {
+                        if isUploading { ProgressView(uploadStatus.isEmpty ? "Uploading…" : uploadStatus) }
+                        else { Label("Upload selected FlySight files", systemImage: "lock.shield") }
+                    }
+                    .disabled(isUploading || selectedForImport.isEmpty || apiBaseURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || handoffToken.count != 64)
+                    if !uploadStatus.isEmpty {
+                        Text(uploadStatus).font(.footnote).foregroundStyle(.secondary)
+                    }
+                    Text("Create a temporary handoff token in your signed-in web logbook, then paste the API URL and token here. The token expires after 10 minutes and cannot access your account.")
+                        .font(.footnote).foregroundStyle(.secondary)
+                }
+
                 if !downloadedFiles.isEmpty {
                     Section("Ready to import into your logbook") {
                         Text("Select TRACK.CSV and SENSOR.CSV together. Share the selected files, then choose the BASE Logbook web app's import screen and select both files in one operation.")
@@ -144,6 +171,74 @@ struct FlySightConnectionView: View {
                     Button("Disconnect") { bluetooth.disconnect() }
                 }
             }
+        }
+    }
+
+
+    private func uploadSelectedFiles() async {
+        guard let base = URL(string: apiBaseURL.trimmingCharacters(in: .whitespacesAndNewlines)),
+              let scheme = base.scheme?.lowercased(), scheme == "https",
+              base.host != nil else {
+            uploadStatus = "Enter the HTTPS address of your deployed logbook API."
+            return
+        }
+        let selected = downloadedFiles.filter { selectedForImport.contains($0.absoluteString) }
+        guard !selected.isEmpty else { uploadStatus = "Select at least one file."; return }
+        isUploading = true
+        defer { isUploading = false }
+        do {
+            for fileURL in selected {
+                let name = fileURL.lastPathComponent.uppercased()
+                guard ["TRACK.CSV", "SENSOR.CSV", "TRACK.GPX"].contains(name) else {
+                    throw UploadError.message("Unsupported file: \(name)")
+                }
+                let data = try Data(contentsOf: fileURL)
+                guard !data.isEmpty, data.count <= 15 * 1024 * 1024 else {
+                    throw UploadError.message("\(name) is empty or exceeds 15 MB.")
+                }
+                let digest = SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+                let chunkSize = 256 * 1024
+                let totalChunks = (data.count + chunkSize - 1) / chunkSize
+                for index in 0..<totalChunks {
+                    let start = index * chunkSize
+                    let end = min(start + chunkSize, data.count)
+                    let chunk = data.subdata(in: start..<end)
+                    let payload: [String: Any] = [
+                        "fileName": name,
+                        "fileSize": data.count,
+                        "sha256": digest,
+                        "chunkIndex": index,
+                        "totalChunks": totalChunks,
+                        "data": chunk.base64EncodedString()
+                    ]
+                    var endpoint = base
+                    endpoint.append(path: "/api/flysight/handoffs/upload")
+                    var request = URLRequest(url: endpoint)
+                    request.httpMethod = "POST"
+                    request.timeoutInterval = 45
+                    request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+                    request.setValue(handoffToken, forHTTPHeaderField: "X-FlySight-Handoff")
+                    request.httpBody = try JSONSerialization.data(withJSONObject: payload)
+                    let (responseData, response) = try await URLSession.shared.data(for: request)
+                    guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
+                        let detail = (try? JSONSerialization.jsonObject(with: responseData) as? [String: Any])?["error"] as? String
+                        throw UploadError.message(detail ?? "Upload failed (HTTP \((response as? HTTPURLResponse)?.statusCode ?? 0)).")
+                    }
+                    uploadStatus = "\(name): \(index + 1)/\(totalChunks) chunks"
+                }
+                uploadStatus = "\(name) uploaded and integrity-checked."
+            }
+            uploadStatus = "Upload complete. Open the logbook import inbox to add the files to a jump draft."
+        } catch {
+            uploadStatus = error.localizedDescription
+        }
+    }
+
+    private enum UploadError: LocalizedError {
+        case message(String)
+        var errorDescription: String? {
+            if case .message(let text) = self { return text }
+            return nil
         }
     }
 
