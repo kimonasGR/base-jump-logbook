@@ -6,6 +6,7 @@ const server = await readFile(new URL('../src/server.js', import.meta.url), 'utf
 const ui = await readFile(new URL('../public/index.html', import.meta.url), 'utf8');
 const migration = await readFile(new URL('../migrations/001_initial.sql', import.meta.url), 'utf8');
 const flySightMigration = await readFile(new URL('../migrations/002_flysight_handoff.sql', import.meta.url), 'utf8');
+const mediaMigration = await readFile(new URL('../migrations/003_user_media.sql', import.meta.url), 'utf8');
 const nativeFlySight = await readFile(new URL('../native/ios/FlySightConnectionView.swift', import.meta.url), 'utf8');
 const vercel = JSON.parse(await readFile(new URL('../vercel.json', import.meta.url), 'utf8'));
 
@@ -87,9 +88,31 @@ test('cloud restore retains local-only media for matching jump IDs', () => {
 });
 
 test('settings accurately disclose local-only media and current voice limitations', () => {
-  assert.match(ui, /Photos and videos are currently stored only on this device\. FlySight GPS track data syncs/);
+  assert.match(ui, /Photos and videos upload to private Neon Object Storage when storage credentials are configured; otherwise they remain on this device/);
   assert.match(ui, /Records audio and sends it to the private AI extraction endpoint/);
   assert.match(ui, /nothing is saved until you review and submit the jump/);
+});
+
+test('jump media uses private Neon Object Storage with user-scoped metadata', () => {
+  assert.match(server, /app\.post\('\\/api\\/media', requireUser, mediaUpload\.single\('file'\)/);
+  assert.match(server, /app\.get\('\\/api\\/media\\/:id\\/url', requireUser/);
+  assert.match(server, /app\.delete\('\\/api\\/media\\/:id', requireUser/);
+  assert.match(server, /new S3Client\(\{[\s\S]*forcePathStyle: true/);
+  assert.match(server, /getSignedUrl\(s3,[\s\S]*expiresIn:900/);
+  assert.match(server, /WHERE id=\$1 AND user_id=\$2/);
+  assert.match(mediaMigration, /CREATE TABLE IF NOT EXISTS user_media/);
+  assert.match(mediaMigration, /REFERENCES app_users\(id\) ON DELETE CASCADE/);
+  assert.match(mediaMigration, /size_bytes BIGINT NOT NULL CHECK/);
+});
+
+test('jump media uploads preserve local copies and sync only private media metadata', () => {
+  assert.match(ui, /window\.uploadCloudMedia=async\(jumpId,items\)/);
+  assert.match(ui, /window\.loadCloudMedia=async\(items\)/);
+  assert.match(ui, /window\.deleteCloudMedia=async\(id\)/);
+  assert.match(ui, /storageId:m\.storageId,name:m\.name,type:m\.type,sizeBytes:m\.sizeBytes/);
+  assert.match(ui, /media:\(j\.media\|\|\[\]\)\.map\(\(\{url,\.\.\.m\}\)=>m\)/);
+  assert.match(ui, /Photos and videos upload to private Neon storage when configured/);
+  assert.match(ui, /mediaDraft\.filter\(m=>m\.data&&!m\.storageId\)/);
 });
 
 test('AI voice draft is wired to the authenticated extraction endpoint', () => {
