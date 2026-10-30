@@ -129,7 +129,8 @@ test('frontend pauses cloud sync on conflict and tracks the acknowledged cloud v
   assert.match(ui, /cloudUpdatedAt=null/);
   assert.match(ui, /expectedUpdatedAt:cloudUpdatedAt/);
   assert.match(ui, /cloudUpdatedAt=result\.updatedAt/);
-  assert.match(ui, /cloudReady=false;syncAgain=false;status\.textContent='Sync paused/);
+  assert.match(ui, /cloudReady=false;syncAgain=false/);
+  assert.match(ui, /status\.textContent='Sync paused: cloud changed on another device/);
 });
 
 test('HTML contains one application shell and one Neon Auth bootstrap', () => {
@@ -161,7 +162,7 @@ test('FlySight importer parses GPX and CSV into bounded GPS track points', () =>
   assert.match(ui, /function parseFlySightCsv\(raw\)/);
   assert.match(ui, /function parseFlySightGpx\(raw\)/);
   assert.match(ui, /function summarizeTrack\(points\)/);
-  assert.match(ui, /points\.length>=10000/);
+  assert.match(ui, /\.slice\(0,10000\)/);
   assert.match(ui, /f\.size>15\*1024\*1024/);
   assert.match(ui, /flysightTrack:trackDraft/);
   assert.match(ui, /Track points and flight statistics are saved with this jump/);
@@ -174,7 +175,8 @@ test('FlySight route preview is rendered from bounded GPS coordinates', () => {
 });
 
 test('FlySight import estimates deployment delay and altitude loss for review', () => {
-  assert.match(ui, /velD=find\(\['veld','down velocity','vertical velocity'\]\)/);
+  assert.match(ui, /downKey=find\(\['veld','vel_d','velocity down','down velocity'\]\)/);
+  assert.match(ui, /p\.velD=number\(row\[downKey\]\)/);
   assert.match(ui, /function detectDeployment\(points\)/);
   assert.match(ui, /startIndex=rows\.findIndex/);
   assert.match(ui, /delaySeconds/);
