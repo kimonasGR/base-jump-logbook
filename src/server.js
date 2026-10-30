@@ -109,8 +109,16 @@ app.get('/api/snapshot', requireUser, asyncRoute(async (req,res) => {
   res.json({ snapshot: r.rows[0]?.payload || null, updatedAt: r.rows[0]?.updated_at || null });
 }));
 app.put('/api/snapshot', requireUser, asyncRoute(async (req,res) => {
-  const snapshot = snapshotSchema.parse(req.body);
-  const r = await pool.query('INSERT INTO user_snapshots(user_id,payload,updated_at) VALUES($1,$2::jsonb,now()) ON CONFLICT(user_id) DO UPDATE SET payload=EXCLUDED.payload,updated_at=now() RETURNING updated_at', [req.user.id, JSON.stringify(snapshot)]);
+  const body = z.object({ ...snapshotSchema.shape, expectedUpdatedAt: z.string().datetime({ offset:true }).nullable().optional() }).strict().parse(req.body);
+  const { expectedUpdatedAt = null, ...snapshot } = body;
+  const r = await pool.query(
+    'INSERT INTO user_snapshots(user_id,payload,updated_at) VALUES($1,$2::jsonb,now()) ON CONFLICT(user_id) DO UPDATE SET payload=EXCLUDED.payload,updated_at=now() WHERE user_snapshots.updated_at=$3::timestamptz RETURNING updated_at',
+    [req.user.id, JSON.stringify(snapshot), expectedUpdatedAt]
+  );
+  if (!r.rowCount) {
+    const current = await pool.query('SELECT updated_at FROM user_snapshots WHERE user_id=$1', [req.user.id]);
+    return res.status(409).json({ error:'Cloud data changed on another device. Sync paused to protect both copies.', code:'SNAPSHOT_CONFLICT', updatedAt:current.rows[0]?.updated_at || null });
+  }
   res.json({ ok:true, updatedAt:r.rows[0].updated_at });
 }));
 
