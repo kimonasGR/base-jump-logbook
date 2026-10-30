@@ -112,7 +112,7 @@ app.put('/api/snapshot', requireUser, asyncRoute(async (req,res) => {
   const body = z.object({ ...snapshotSchema.shape, expectedUpdatedAt: z.string().datetime({ offset:true }).nullable().optional() }).strict().parse(req.body);
   const { expectedUpdatedAt = null, ...snapshot } = body;
   const r = await pool.query(
-    'INSERT INTO user_snapshots(user_id,payload,updated_at) VALUES($1,$2::jsonb,now()) ON CONFLICT(user_id) DO UPDATE SET payload=EXCLUDED.payload,updated_at=now() WHERE user_snapshots.updated_at=$3::timestamptz RETURNING updated_at',
+    'INSERT INTO user_snapshots(user_id,payload,updated_at) VALUES($1,$2::jsonb,date_trunc('milliseconds',now())) ON CONFLICT(user_id) DO UPDATE SET payload=EXCLUDED.payload,updated_at=date_trunc('milliseconds',now()) WHERE user_snapshots.updated_at=$3::timestamptz RETURNING updated_at',
     [req.user.id, JSON.stringify(snapshot), expectedUpdatedAt]
   );
   if (!r.rowCount) {
