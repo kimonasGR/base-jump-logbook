@@ -27,12 +27,26 @@ async function requireUser(req, res, next) {
     const header = req.headers.authorization || '';
     if (!header.startsWith('Bearer ')) return res.status(401).json({ error: 'Sign in required.' });
     const verifyOptions = process.env.NEON_AUTH_ISSUER ? { issuer: process.env.NEON_AUTH_ISSUER } : {};
-    const { payload } = await jwtVerify(header.slice(7), jwks, verifyOptions);
+    let payload;
+    try {
+      ({ payload } = await jwtVerify(header.slice(7), jwks, verifyOptions));
+    } catch (e) {
+      console.error('Neon Auth JWT verification failed', { name: e?.name, code: e?.code, message: e?.message, issuerConfigured: Boolean(process.env.NEON_AUTH_ISSUER) });
+      return res.status(401).json({ error: 'Session token could not be verified.', code: e?.code || 'JWT_INVALID' });
+    }
     if (!payload.sub || typeof payload.sub !== 'string') return res.status(401).json({ error: 'Token has no user identity.' });
     req.user = { id: payload.sub };
-    await pool.query('INSERT INTO app_users(id) VALUES($1) ON CONFLICT (id) DO NOTHING', [req.user.id]);
+    try {
+      await pool.query('INSERT INTO app_users(id) VALUES($1) ON CONFLICT (id) DO NOTHING', [req.user.id]);
+    } catch (e) {
+      console.error('User bootstrap database error', { code: e?.code, message: e?.message });
+      return res.status(503).json({ error: 'Account database is temporarily unavailable.' });
+    }
     next();
-  } catch (e) { return res.status(401).json({ error: 'Invalid or expired session.' }); }
+  } catch (e) {
+    console.error('Authentication middleware error', { name: e?.name, code: e?.code, message: e?.message });
+    return res.status(500).json({ error: 'Authentication service error.' });
+  }
 }
 
 app.get('/api/health', (_req, res) => res.json({ ok: true, service: 'base-jump-logbook-api', voiceExtraction: Boolean(process.env.OPENAI_API_KEY), authConfigured: Boolean(jwks) }));
