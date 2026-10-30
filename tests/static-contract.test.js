@@ -6,6 +6,7 @@ const server = await readFile(new URL('../src/server.js', import.meta.url), 'utf
 const ui = await readFile(new URL('../public/index.html', import.meta.url), 'utf8');
 const migration = await readFile(new URL('../migrations/001_initial.sql', import.meta.url), 'utf8');
 const flySightMigration = await readFile(new URL('../migrations/002_flysight_handoff.sql', import.meta.url), 'utf8');
+const nativeFlySight = await readFile(new URL('../native/ios/FlySightConnectionView.swift', import.meta.url), 'utf8');
 const vercel = JSON.parse(await readFile(new URL('../vercel.json', import.meta.url), 'utf8'));
 
 test('all private data routes require authenticated user middleware', () => {
@@ -287,4 +288,22 @@ test('FlySight handoff uses short-lived hashed upload tokens and bounded chunk s
   assert.match(flySightMigration, /CREATE TABLE IF NOT EXISTS flysight_handoffs/);
   assert.match(flySightMigration, /CREATE TABLE IF NOT EXISTS flysight_handoff_chunks/);
   assert.match(flySightMigration, /ON DELETE CASCADE/);
+});
+
+
+test('native FlySight uploader uses HTTPS, bounded chunks and the scoped handoff token', () => {
+  assert.match(nativeFlySight, /scheme == "https"/);
+  assert.match(nativeFlySight, /256 \* 1024/);
+  assert.match(nativeFlySight, /15 \* 1024 \* 1024/);
+  assert.match(nativeFlySight, /X-FlySight-Handoff/);
+  assert.match(nativeFlySight, /SHA256\.hash\(data: data\)/);
+  assert.match(nativeFlySight, /TRACK\.CSV.*SENSOR\.CSV.*TRACK\.GPX/);
+});
+
+test('web logbook can create a handoff token and load verified uploaded chunks into the existing importer', () => {
+  assert.match(ui, /createFlySightHandoff/);
+  assert.match(ui, /\/api\/flysight\/handoffs/);
+  assert.match(ui, /loadFlySightInbox/);
+  assert.match(ui, /crypto\.subtle\.digest\('SHA-256',bytes\)/);
+  assert.match(ui, /picker\.dispatchEvent\(new Event\('change'/);
 });
