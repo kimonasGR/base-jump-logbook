@@ -28,7 +28,13 @@ test('all private data routes require authenticated user middleware', () => {
   ]) assert.ok(server.includes(route), `Missing protected route: ${route}`);
 });
 
-test('snapshot cloud sync is authenticated and user-scoped', () => {\n  assert.ok(server.includes("app.get('/api/snapshot', requireUser"));\n  assert.ok(server.includes("app.put('/api/snapshot', requireUser"));\n  assert.match(migration, /CREATE TABLE IF NOT EXISTS user_snapshots/);\n});\n\ntest('database enforces per-user ownership and unique jump numbering', () => {
+test('snapshot cloud sync is authenticated and user-scoped', () => {
+  assert.ok(server.includes("app.get('/api/snapshot', requireUser"));
+  assert.ok(server.includes("app.put('/api/snapshot', requireUser"));
+  assert.match(migration, /CREATE TABLE IF NOT EXISTS user_snapshots/);
+});
+
+test('database enforces per-user ownership and unique jump numbering', () => {
   assert.match(migration, /UNIQUE\s*\(user_id,\s*jump_number\)/i);
   assert.match(migration, /REFERENCES app_users\(id\) ON DELETE CASCADE/i);
   assert.match(migration, /CHECK\s*\(\(object_type IS DISTINCT FROM 'Other'\)/i);
