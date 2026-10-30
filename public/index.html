@@ -119,7 +119,7 @@ const AUTH_URL='https://ep-young-truth-badvxgct.neonauth.c-8.eu-central-1.aws.ne
 const neonAuth=createInternalNeonAuth(AUTH_URL);
 const auth=neonAuth.adapter;
 const gate=document.getElementById('authGate'), errorBox=document.getElementById('authError'), submit=document.getElementById('authSubmit'), toggle=document.getElementById('authToggle'), status=document.getElementById('authStatus');
-let creating=false, cloudReady=false, syncBusy=false, syncAgain=false, bearer=null;
+let creating=false, cloudReady=false, syncBusy=false, syncAgain=false, bearer=null, cloudUpdatedAt=null;
 function showError(e){errorBox.textContent=e?.message||String(e)||'Authentication failed.'}
 async function getToken(){
   const token=await neonAuth.getJWTToken();
@@ -139,26 +139,29 @@ async function syncCloud(){
   syncBusy=true;
   try{
     const snapshot=window.getLocalSnapshot();
-    await api('/api/snapshot',{method:'PUT',body:JSON.stringify(snapshot)});
+    const result=await api('/api/snapshot',{method:'PUT',body:JSON.stringify({...snapshot,expectedUpdatedAt:cloudUpdatedAt})});
+    cloudUpdatedAt=result.updatedAt;
     status.textContent='Cloud sync active · '+new Date().toLocaleTimeString();
-  }catch(e){status.textContent='Cloud sync issue · '+e.message}
+  }catch(e){if(/Cloud data changed on another device|SNAPSHOT_CONFLICT/.test(e.message)){cloudReady=false;syncAgain=false;status.textContent='Sync paused: cloud changed on another device. Export this device’s backup before resolving the conflict.'}else status.textContent='Cloud sync issue · '+e.message}
   finally{syncBusy=false;if(syncAgain){syncAgain=false;syncCloud()}}
 }
 window.cloudSync=()=>{if(cloudReady)syncCloud()};
-window.signOutLogbook=async()=>{try{await auth.signOut();cloudReady=false;bearer=null;gate.style.display='flex';status.textContent='Signed out';errorBox.textContent='';}catch(e){showError(e)}};
+window.signOutLogbook=async()=>{try{await auth.signOut();cloudReady=false;bearer=null;cloudUpdatedAt=null;gate.style.display='flex';status.textContent='Signed out';errorBox.textContent='';}catch(e){showError(e)}};
 async function enterApp(){
   const session=await auth.getSession();
   if(!session?.data?.user&&!session?.user)throw Error('No active session.');
   bearer=await getToken();
   await api('/api/me');
   const cloud=await api('/api/snapshot');
+  cloudUpdatedAt=cloud.updatedAt||null;
   if(cloud.snapshot){
     const local=window.getLocalSnapshot();
     const localHasData=local.jumps.length||local.objects.length||local.gears.length;
     if(localHasData&&!confirm('A cloud logbook already exists. Load the cloud copy on this device? Your current local records will be replaced. Export a local backup first if you need to keep them.'))throw Error('Cloud data was not loaded. Your local data has not been uploaded or overwritten. Export a backup, then choose Sign in again to load the cloud copy.');
     window.setCloudSnapshot(cloud.snapshot);
   }else{
-    await api('/api/snapshot',{method:'PUT',body:JSON.stringify(window.getLocalSnapshot())});
+    const initial=await api('/api/snapshot',{method:'PUT',body:JSON.stringify({...window.getLocalSnapshot(),expectedUpdatedAt:null})});
+    cloudUpdatedAt=initial.updatedAt;
   }
   cloudReady=true;gate.style.display='none';
   const email=session.data?.user?.email||session.user?.email||'Signed in';
