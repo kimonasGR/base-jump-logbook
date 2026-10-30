@@ -221,7 +221,6 @@ test('FlySight import accepts TRACK and SENSOR files together', () => {
   assert.match(ui, /trackDraft\.sensorData\?'<div class=/);
   assert.match(ui, /Sensor files imported:/);
 });
-\+sensor\)/);
   assert.match(ui, /\['GNSS','GPS','TRACK'\]/);
   assert.match(ui, /function splitCsvLine\(line\)/);
 });
