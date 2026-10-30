@@ -122,7 +122,7 @@ struct FlySightConnectionView: View {
                         if isUploading { ProgressView(uploadStatus.isEmpty ? "Uploading…" : uploadStatus) }
                         else { Label("Upload selected FlySight files", systemImage: "lock.shield") }
                     }
-                    .disabled(isUploading || selectedForImport.isEmpty || apiBaseURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || handoffToken.count != 64)
+                    .disabled(isUploading || selectedForImport.isEmpty || apiBaseURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || handoffToken.trimmingCharacters(in: .whitespacesAndNewlines).count != 64)
                     if !uploadStatus.isEmpty {
                         Text(uploadStatus).font(.footnote).foregroundStyle(.secondary)
                     }
@@ -182,6 +182,11 @@ struct FlySightConnectionView: View {
             uploadStatus = "Enter the HTTPS address of your deployed logbook API."
             return
         }
+        let token = handoffToken.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard token.range(of: "^[A-Fa-f0-9]{64}$", options: .regularExpression) != nil else {
+            uploadStatus = "Paste the complete 64-character handoff token without extra characters."
+            return
+        }
         let selected = downloadedFiles.filter { selectedForImport.contains($0.absoluteString) }
         guard !selected.isEmpty else { uploadStatus = "Select at least one file."; return }
         isUploading = true
@@ -217,7 +222,7 @@ struct FlySightConnectionView: View {
                     request.httpMethod = "POST"
                     request.timeoutInterval = 45
                     request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-                    request.setValue(handoffToken, forHTTPHeaderField: "X-FlySight-Handoff")
+                    request.setValue(token, forHTTPHeaderField: "X-FlySight-Handoff")
                     request.httpBody = try JSONSerialization.data(withJSONObject: payload)
                     let (responseData, response) = try await URLSession.shared.data(for: request)
                     guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
