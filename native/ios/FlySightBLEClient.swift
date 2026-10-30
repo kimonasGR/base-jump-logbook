@@ -1,4 +1,5 @@
 import Foundation
+import Combine
 import CoreBluetooth
 
 /// CoreBluetooth transport for FlySight 2. This is a native iOS component;
