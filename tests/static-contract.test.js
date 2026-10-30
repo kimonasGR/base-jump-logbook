@@ -163,3 +163,9 @@ test('FlySight time parser supports elapsed seconds and absolute timestamps', ()
   assert.match(ui, /const ts=trackTimeMs\(p\.time\)/);
   assert.match(ui, /times=points\.map\(p=>trackTimeMs\(p\.time\)\)/);
 });
+
+test('FlySight altitude profile uses imported altitude samples', () => {
+  assert.match(ui, /function trackProfileHtml\(t\)/);
+  assert.match(ui, /aria-label=\"FlySight altitude profile\"/);
+  assert.match(ui, /trackProfileHtml\(trackDraft\)/);
+});
