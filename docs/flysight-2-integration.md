@@ -6,12 +6,13 @@ The web logbook imports `TRACK.CSV` (or GPX) and optionally `SENSOR.CSV` togethe
 
 ## Native iOS Bluetooth prototype
 
-The native source is in `native/ios/`. It is a source prototype, not yet a complete Xcode project or installable app.
+The native source and XcodeGen project definition are in `native/ios/`. Generate the Xcode project with `brew install xcodegen && cd native/ios && xcodegen generate`. Open `BASEJumpLogbook.xcodeproj` in Xcode, select a signing team, then build/run on a paired iPhone.
 
 - `FlySightBLEClient.swift`: CoreBluetooth discovery, bonding trigger, GNSS telemetry, battery/mode reads, directory listing and file reads.
 - `FlySightConnectionView.swift`: SwiftUI device picker, telemetry display, file browser, CSV download and iOS share sheet.
 - `FlySightLogbookApp.swift`: SwiftUI app entry point.
-- `Info.plist.fragment`: Bluetooth privacy usage description to merge into the app's Info.plist.
+- `project.yml`: XcodeGen project definition, iOS 17 target and generated Bluetooth privacy usage description.
+- `Info.plist.fragment`: reference Bluetooth privacy usage description (the generated project configures this automatically).
 
 ### File transfer protocol implemented in the prototype
 
@@ -26,7 +27,7 @@ Based on the FlySight 2 firmware BLE developer documentation:
 7. Treat `0xf0` as command rejection and `0xf1` as command acknowledgement. The prototype also applies a 30-second transfer timeout and supports `0xff` cancellation.
 8. Save downloaded files in the app's Documents directory and expose them through the iOS share sheet. The source files on the FlySight are never modified or deleted.
 
-The protocol documentation specifies Go-Back-N with a window of eight packets and 242-byte frames. The current client acknowledges received packets individually; retransmission behavior, negotiated MTU edge cases, and long-transfer reliability still require validation against hardware and firmware.
+The protocol documentation specifies Go-Back-N with a window of eight packets and 242-byte frames. The client now tracks sequential receive counters, re-acknowledges the immediately previous duplicate without appending it twice, leaves out-of-order packets unacknowledged, and sends a 15-second keep-alive. This is not yet a proven full Go-Back-N implementation: counter wrap, older duplicates, retransmission timing, negotiated MTU edge cases, and long-transfer reliability still require validation against hardware and firmware.
 
 ## Planned import workflow
 
@@ -39,7 +40,7 @@ The protocol documentation specifies Go-Back-N with a window of eight packets an
 
 ## Known gaps before release
 
-- Create and sign a real iOS Xcode project and configure the Bluetooth usage string.
+- Configure Apple signing/team and install the generated app on a physical iPhone.
 - Validate secure pairing, device discovery and mode values on actual iPhone/FlySight hardware.
 - Confirm directory path conventions and packet offsets using real device responses.
 - Implement robust Go-Back-N retransmission/window handling and MTU negotiation; test interrupted and large downloads.
