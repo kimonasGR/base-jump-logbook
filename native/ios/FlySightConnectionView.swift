@@ -71,13 +71,13 @@ struct FlySightConnectionView: View {
 
     private var statusText: String {
         switch bluetooth.state {
-        case .unavailable: "Bluetooth unavailable"
-        case .poweredOff: "Bluetooth is off"
-        case .scanning: "Scanning"
-        case .connecting: "Connecting"
-        case .pairingRequired: "Pairing required — accept the iOS prompt"
-        case .connected: "Connected"
-        case .disconnected(let message): message
+        case .unavailable: return "Bluetooth unavailable"
+        case .poweredOff: return "Bluetooth is off"
+        case .scanning: return "Scanning"
+        case .connecting: return "Connecting"
+        case .pairingRequired: return "Pairing required — accept the iOS prompt"
+        case .connected: return "Connected"
+        case .disconnected(let message): return message
         }
     }
 
