@@ -182,6 +182,30 @@ async function api(path,opts={}){
   return data;
 }
 window.lookupCountry=async(latitude,longitude)=>{const result=await api('/api/geocode/reverse?lat='+encodeURIComponent(latitude)+'&lon='+encodeURIComponent(longitude));return result.country||null};
+
+window.uploadCloudMedia=async(jumpId,items)=>{
+  if(!bearer)throw Error('Sign in to upload private attachments.');
+  const uploaded=[];
+  for(const item of items){
+    const blob=await (await fetch(item.data)).blob();
+    const form=new FormData();form.append('jumpId',jumpId);form.append('file',blob,item.name||'attachment');
+    const response=await fetch('/api/media',{method:'POST',headers:{Authorization:'Bearer '+bearer},body:form});
+    const data=await response.json().catch(()=>({}));
+    if(!response.ok)throw Error(data.error||'Media upload failed ('+response.status+').');
+    uploaded.push({...data,localId:item.localId});
+  }
+  return uploaded;
+};
+window.loadCloudMedia=async(items)=>{
+  if(!bearer)throw Error('Sign in to load private attachments.');
+  await Promise.all(items.filter(item=>item.storageId&&!item.data&&!item.url).map(async item=>{
+    const result=await api('/api/media/'+encodeURIComponent(item.storageId)+'/url');
+    item.url=result.url;
+  }));
+  return items;
+};
+window.deleteCloudMedia=async(id)=>api('/api/media/'+encodeURIComponent(id),{method:'DELETE'});
+
 function scheduleCloudRetry(){
   if(!cloudReady||syncRetryTimer)return;
   const delay=Math.min(60000,1000*(2**Math.min(syncRetryAttempt,6)));
