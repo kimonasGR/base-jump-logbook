@@ -250,10 +250,12 @@ struct FlySightConnectionView: View {
                 }
             } catch let error as UploadError {
                 throw error
+            } catch is CancellationError {
+                throw CancellationError()
             } catch {
                 if attempt == 2 { throw error }
             }
-            try? await Task.sleep(nanoseconds: UInt64(1 << attempt) * 1_000_000_000)
+            try await Task.sleep(nanoseconds: UInt64(1 << attempt) * 1_000_000_000)
         }
         throw UploadError.message("Upload failed after three attempts.")
     }
