@@ -28,7 +28,13 @@ final class FlySightBLEClient: NSObject, ObservableObject {
     @Published private(set) var batteryPercent: Int?
     @Published private(set) var deviceMode: UInt8?
     @Published private(set) var latestGNSS: GNSSSample?
-    @Published private(set) var discoveredDeviceNames: [String] = []
+    @Published private(set) var discoveredDevices: [FlySightDevice] = []
+
+    struct FlySightDevice: Identifiable {
+        let peripheral: CBPeripheral
+        let name: String
+        var id: UUID { peripheral.identifier }
+    }
 
     private let fileService = CBUUID(string: "00000000-cc7a-482a-984a-7f2ed5b3e58f")
     private let sensorService = CBUUID(string: "00000001-cc7a-482a-984a-7f2ed5b3e58f")
@@ -51,7 +57,7 @@ final class FlySightBLEClient: NSObject, ObservableObject {
 
     func startScan() {
         guard central.state == .poweredOn else { return }
-        discoveredDeviceNames = []
+        discoveredDevices = []
         state = .scanning
         // FlySight 2 advertises its manufacturer ID (0x09DB); its custom
         // services are discovered after connection, not necessarily advertised.
@@ -132,9 +138,9 @@ extension FlySightBLEClient: CBCentralManagerDelegate {
         guard let manufacturer, manufacturer.count >= 3,
               manufacturer[0] == 0xDB, manufacturer[1] == 0x09 else { return }
         let name = peripheral.name ?? advertisementData[CBAdvertisementDataLocalNameKey] as? String ?? "FlySight 2"
-        if !discoveredDeviceNames.contains(name) { discoveredDeviceNames.append(name) }
-        // Keep the peripheral instance available to the UI via the discovered list in a future adapter.
-        self.peripheral = self.peripheral ?? peripheral
+        if !discoveredDevices.contains(where: { $0.id == peripheral.identifier }) {
+            discoveredDevices.append(FlySightDevice(peripheral: peripheral, name: name))
+        }
         deviceName = name
     }
 
