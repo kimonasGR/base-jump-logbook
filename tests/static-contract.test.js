@@ -113,6 +113,8 @@ test('jump media uploads preserve local copies and sync only private media metad
   assert.match(ui, /media:\(j\.media\|\|\[\]\)\.map\(\(\{url,\.\.\.m\}\)=>m\)/);
   assert.match(ui, /Photos and videos upload to private Neon storage when configured/);
   assert.match(ui, /mediaDraft\.filter\(m=>m\.data&&!m\.storageId\)/);
+  assert.match(ui, /let pendingMediaDeletes=\[\]/);
+  assert.match(ui, /pendingMediaDeletes\.forEach\(id=>window\.deleteCloudMedia/);
 });
 
 test('AI voice draft is wired to the authenticated extraction endpoint', () => {
