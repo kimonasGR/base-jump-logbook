@@ -1,4 +1,5 @@
 import express from 'express';
+import { createHash, randomBytes } from 'node:crypto';
 import helmet from 'helmet';
 import cors from 'cors';
 import multer from 'multer';
@@ -112,6 +113,94 @@ app.post('/api/voice/extract', requireUser, upload.single('audio'), asyncRoute(a
   const draft=JSON.parse(outputText); draft.transcript=transcript;
   // Intentionally return a draft only. This endpoint never writes a jump to the database.
   res.json({draft,requiresConfirmation:true,storedAudio:false});
+}));
+
+
+
+// Short-lived, upload-only FlySight handoff. The native app never receives a
+// Neon/Auth session token; the random capability is stored only as a SHA-256 hash.
+const handoffChunkBytes = 256 * 1024;
+const handoffFileLimit = 15 * 1024 * 1024;
+const handoffFileNames = new Set(['TRACK.CSV','SENSOR.CSV','TRACK.GPX']);
+const tokenDigest = value => createHash('sha256').update(value).digest('hex');
+const handoffUploadSchema = z.object({
+  fileName:z.string().trim().min(1).max(120),
+  fileSize:z.number().int().positive().max(handoffFileLimit),
+  sha256:z.string().regex(/^[a-f0-9]{64}$/i),
+  chunkIndex:z.number().int().nonnegative(),
+  totalChunks:z.number().int().positive().max(60),
+  data:z.string().min(1).max(360000)
+}).strict();
+
+app.post('/api/flysight/handoffs', requireUser, asyncRoute(async (req,res) => {
+  await pool.query("DELETE FROM flysight_handoffs WHERE expires_at < now() OR consumed_at IS NOT NULL");
+  const token=randomBytes(32).toString('hex');
+  const expiresAt=new Date(Date.now()+10*60*1000);
+  await pool.query('INSERT INTO flysight_handoffs(user_id,token_hash,expires_at) VALUES($1,$2,$3)',[req.user.id,tokenDigest(token),expiresAt]);
+  res.status(201).json({token,expiresAt,uploadLimitBytes:handoffFileLimit,chunkBytes:handoffChunkBytes});
+}));
+
+app.post('/api/flysight/handoffs/upload', asyncRoute(async (req,res) => {
+  const token=String(req.headers['x-flysight-handoff']||'');
+  if(!/^[a-f0-9]{64}$/i.test(token)) return res.status(401).json({error:'A valid handoff token is required.'});
+  const digest=tokenDigest(token);
+  const session=await pool.query('SELECT id FROM flysight_handoffs WHERE token_hash=$1 AND expires_at>now() AND consumed_at IS NULL',[digest]);
+  if(!session.rowCount) return res.status(401).json({error:'Handoff token is invalid or expired.'});
+  const v=handoffUploadSchema.parse(req.body);
+  const name=v.fileName.toUpperCase();
+  if(!handoffFileNames.has(name)) return res.status(400).json({error:'Only TRACK.CSV, SENSOR.CSV or TRACK.GPX can be uploaded.'});
+  const expectedChunks=Math.ceil(v.fileSize/handoffChunkBytes);
+  if(v.totalChunks!==expectedChunks||v.chunkIndex>=v.totalChunks) return res.status(400).json({error:'Chunk count does not match the declared file size.'});
+  if(!/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(v.data)) return res.status(400).json({error:'Chunk encoding is invalid.'});
+  const bytes=Buffer.from(v.data,'base64');
+  const expectedLength=v.chunkIndex===v.totalChunks-1?v.fileSize-v.chunkIndex*handoffChunkBytes:handoffChunkBytes;
+  if(bytes.length!==expectedLength||bytes.length>handoffChunkBytes) return res.status(400).json({error:'Chunk byte length is invalid.'});
+  const client=await pool.connect();
+  try{
+    await client.query('BEGIN');
+    const file=await client.query(
+      `INSERT INTO flysight_handoff_files(handoff_id,file_name,file_size,sha256,total_chunks)
+       VALUES($1,$2,$3,$4,$5)
+       ON CONFLICT(handoff_id,file_name) DO UPDATE SET file_name=EXCLUDED.file_name
+       WHERE flysight_handoff_files.file_size=EXCLUDED.file_size AND flysight_handoff_files.sha256=EXCLUDED.sha256 AND flysight_handoff_files.total_chunks=EXCLUDED.total_chunks
+       RETURNING id,completed_at`,
+      [session.rows[0].id,name,v.fileSize,v.sha256.toLowerCase(),v.totalChunks]
+    );
+    if(!file.rowCount){await client.query('ROLLBACK');return res.status(409).json({error:'A different file with this name is already in this handoff.'});}
+    if(file.rows[0].completed_at){await client.query('COMMIT');return res.json({ok:true,complete:true});}
+    await client.query('INSERT INTO flysight_handoff_chunks(file_id,chunk_index,data) VALUES($1,$2,$3) ON CONFLICT(file_id,chunk_index) DO NOTHING',[file.rows[0].id,v.chunkIndex,bytes]);
+    const count=await client.query('SELECT count(*)::int AS n FROM flysight_handoff_chunks WHERE file_id=$1',[file.rows[0].id]);
+    const complete=count.rows[0].n===v.totalChunks;
+    if(complete) await client.query('UPDATE flysight_handoff_files SET completed_at=now() WHERE id=$1',[file.rows[0].id]);
+    await client.query('COMMIT');
+    res.status(complete?201:202).json({ok:true,complete,receivedChunks:count.rows[0].n,totalChunks:v.totalChunks});
+  }catch(e){await client.query('ROLLBACK');throw e;}finally{client.release();}
+}));
+
+app.get('/api/flysight/handoffs', requireUser, asyncRoute(async (req,res) => {
+  const r=await pool.query(
+    `SELECT h.id AS handoff_id,f.id AS file_id,f.file_name,f.file_size,f.sha256,f.total_chunks,f.completed_at
+     FROM flysight_handoffs h JOIN flysight_handoff_files f ON f.handoff_id=h.id
+     WHERE h.user_id=$1 AND h.expires_at>now() AND h.consumed_at IS NULL AND f.completed_at IS NOT NULL
+     ORDER BY f.completed_at,f.file_name`,[req.user.id]);
+  res.json({files:r.rows});
+}));
+app.get('/api/flysight/handoffs/:fileId/chunks/:index', requireUser, asyncRoute(async (req,res) => {
+  const index=Number(req.params.index);
+  if(!Number.isSafeInteger(index)||index<0) return res.status(400).json({error:'Invalid chunk index.'});
+  const r=await pool.query(
+    `SELECT encode(c.data,'base64') AS data,f.total_chunks
+     FROM flysight_handoff_chunks c JOIN flysight_handoff_files f ON f.id=c.file_id
+     JOIN flysight_handoffs h ON h.id=f.handoff_id
+     WHERE f.id=$1 AND c.chunk_index=$2 AND h.user_id=$3 AND h.expires_at>now() AND h.consumed_at IS NULL AND f.completed_at IS NOT NULL`,
+    [req.params.fileId,index,req.user.id]);
+  if(!r.rowCount) return res.status(404).json({error:'Uploaded file chunk not found.'});
+  res.json({data:r.rows[0].data,totalChunks:r.rows[0].total_chunks});
+}));
+app.delete('/api/flysight/handoffs/:handoffId', requireUser, asyncRoute(async (req,res) => {
+  const r=await pool.query('DELETE FROM flysight_handoffs WHERE id=$1 AND user_id=$2 RETURNING id',[req.params.handoffId,req.user.id]);
+  if(!r.rowCount) return res.status(404).json({error:'Handoff not found.'});
+  res.status(204).end();
 }));
 
 
