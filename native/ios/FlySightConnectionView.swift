@@ -6,6 +6,7 @@ struct FlySightConnectionView: View {
     @State private var downloadedFiles: [URL] = []
     @State private var isListing = false
     @State private var downloadingName: String?
+    @State private var transferSaveError: String?
 
     var body: some View {
         NavigationStack {
@@ -96,6 +97,9 @@ struct FlySightConnectionView: View {
                     if !bluetooth.transferStatus.isEmpty {
                         Text(bluetooth.transferStatus).font(.footnote).foregroundStyle(.secondary)
                     }
+                    if let transferSaveError {
+                        Text(transferSaveError).font(.footnote).foregroundStyle(.red)
+                    }
                 }
 
                 if !downloadedFiles.isEmpty {
@@ -136,7 +140,7 @@ struct FlySightConnectionView: View {
                     try data.write(to: destination, options: .atomic)
                     if !downloadedFiles.contains(destination) { downloadedFiles.append(destination) }
                 } catch {
-                    bluetooth.transferStatus = "Could not save file: " + error.localizedDescription
+                    transferSaveError = "Could not save file: " + error.localizedDescription
                 }
             case .failure:
                 break
