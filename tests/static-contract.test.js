@@ -205,6 +205,8 @@ test('FlySight 2 SENSOR.CSV imports sensor schemas, units, variables and samples
   assert.match(ui, /a\[0\]==='\$UNIT'/);
   assert.match(ui, /a\[0\]==='\$VAR'/);
   assert.match(ui, /sensor\.samples\+\+/);
+  assert.match(ui, /m\.min=Math\.min\(m\.min,n\)/);
+  assert.match(ui, /m\.average=m\.count\?m\.sum\/m\.count:null/);
   assert.match(ui, /name==='SENSOR\.CSV'\|\|name\.includes\('SENSOR'\)/);
 });
 test('FlySight import accepts TRACK and SENSOR files together', () => {
