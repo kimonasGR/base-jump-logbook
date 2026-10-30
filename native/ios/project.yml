@@ -18,6 +18,6 @@ targets:
         SWIFT_VERSION: "5.0"
         TARGETED_DEVICE_FAMILY: "1"
         GENERATE_INFOPLIST_FILE: YES
-        INFOPLIST_KEY_NS BluetoothAlwaysUsageDescription: "Connect to your FlySight 2 to import jump tracks and sensor measurements."
+        INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription: "Connect to your FlySight 2 to import jump tracks and sensor measurements."
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
         IPHONEOS_DEPLOYMENT_TARGET: "17.0"
