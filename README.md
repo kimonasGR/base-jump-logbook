@@ -31,7 +31,7 @@ The web app can import `TRACK.CSV` and `SENSOR.CSV` together. Sensor streams cur
 Native iOS prototype source is in `native/ios/`:
 - `FlySightLogbookApp.swift`: SwiftUI app entry point.
 - `FlySightConnectionView.swift`: discovery and telemetry prototype UI.
-- `FlySightBLEClient.swift`: CoreBluetooth discovery, secure connection setup, battery/mode reads, and GNSS notification decoding.
+- `FlySightBLEClient.swift`: CoreBluetooth discovery, secure connection setup, battery/mode reads, GNSS notifications, device directory listing and CSV file downloads.
 - `Info.plist.fragment`: Bluetooth privacy usage description to merge into the app's Info.plist.
 
 These files are source components, not a complete Xcode project. Direct iPhone-to-FlySight file transfer is not implemented yet. The BLE implementation must be checked against the exact firmware and tested on a physical iPhone/FlySight 2 before use. See [the integration plan](docs/flysight-2-integration.md).
