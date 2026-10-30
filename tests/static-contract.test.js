@@ -84,7 +84,9 @@ test('cloud conflict cancellation never uploads local data over the cloud copy',
 
 test('cloud restore retains local-only media for matching jump IDs', () => {
   assert.match(ui, /const localMedia=new Map\(db\.jumps\.map\(j=>\[j\.id,j\.media\|\|\[\]\]\)\)/);
-  assert.match(ui, /media:j\.media\|\|localMedia\.get\(j\.id\)\|\|\[\]/);
+  assert.match(ui, /remote=j\.media\|\|\[\]/);
+  assert.match(ui, /local\.filter\(m=>!m\.storageId\)/);
+  assert.match(ui, /local\.find\(l=>l\.storageId===m\.storageId\)/);
 });
 
 test('settings accurately disclose local-only media and current voice limitations', () => {
