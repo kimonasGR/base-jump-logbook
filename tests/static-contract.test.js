@@ -5,6 +5,7 @@ import { readFile } from 'node:fs/promises';
 const server = await readFile(new URL('../src/server.js', import.meta.url), 'utf8');
 const ui = await readFile(new URL('../public/index.html', import.meta.url), 'utf8');
 const migration = await readFile(new URL('../migrations/001_initial.sql', import.meta.url), 'utf8');
+const flySightMigration = await readFile(new URL('../migrations/002_flysight_handoff.sql', import.meta.url), 'utf8');
 const vercel = JSON.parse(await readFile(new URL('../vercel.json', import.meta.url), 'utf8'));
 
 test('all private data routes require authenticated user middleware', () => {
@@ -283,7 +284,7 @@ test('FlySight handoff uses short-lived hashed upload tokens and bounded chunk s
   assert.match(server, /app\.post\('\/api\/flysight\/handoffs\/upload'/);
   assert.match(server, /app\.get\('\/api\/flysight\/handoffs', requireUser/);
   assert.match(server, /h\.user_id=\$3/);
-  assert.match(migration, /CREATE TABLE IF NOT EXISTS flysight_handoffs/);
-  assert.match(migration, /CREATE TABLE IF NOT EXISTS flysight_handoff_chunks/);
-  assert.match(migration, /ON DELETE CASCADE/);
+  assert.match(flySightMigration, /CREATE TABLE IF NOT EXISTS flysight_handoffs/);
+  assert.match(flySightMigration, /CREATE TABLE IF NOT EXISTS flysight_handoff_chunks/);
+  assert.match(flySightMigration, /ON DELETE CASCADE/);
 });
