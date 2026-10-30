@@ -255,6 +255,13 @@ test('FlySight import accepts TRACK and SENSOR files together', () => {
 });
 
 
+test('native FlySight upload retries transient HTTP and transport failures', () => {
+  assert.match(nativeFlySight, /private func sendUploadRequest\(_ request: URLRequest\) async throws/);
+  assert.match(nativeFlySight, /for attempt in 0\.\.\<3/);
+  assert.match(nativeFlySight, /http\.statusCode == 408 \|\| http\.statusCode == 429 \|\| http\.statusCode >= 500/);
+  assert.match(nativeFlySight, /Task\.sleep\(nanoseconds:/);
+});
+
 test('FlySight inbox offers explicit deletion after files are imported into the draft', () => {
   assert.match(ui, /id="clearFlySightInbox"/);
   assert.match(ui, /const inboxStatus=document.getElementById\('flySightInboxStatus'\)/);
