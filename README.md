@@ -4,9 +4,9 @@ Private, mobile-first BASE jumping logbook.
 
 ## Status
 
-The repository contains a private web logbook prototype with authenticated API routes, account-scoped cloud snapshot sync, local recovery backups, and FlySight GPX/CSV import. It is **not yet production-ready**. Native iOS Bluetooth source includes device discovery, telemetry, a basic directory/file-read flow, packet sequencing, and transfer keep-alive. It remains a prototype: the XcodeGen project builds for iOS Simulator, but has not been signed, installed on a physical iPhone, or validated with a FlySight device.
+The repository contains a private, mobile-first web logbook with authenticated API routes, account-scoped cloud snapshot sync, local recovery backups, FlySight GPX/CSV import, and a native iOS companion source project. The native companion includes BLE discovery, pairing flow, telemetry, directory listing, file downloads, and secure chunked upload to the signed-in web account's import inbox. The iOS Simulator build and Swift source checks run in CI. A signed physical-device build and end-to-end validation with an actual FlySight 2 remain release gates.
 
-Jump records and FlySight track data sync to the private Neon account. Photos and videos can be stored in the private `base-jump-media` Neon Object Storage bucket; uploads are limited to 3 MB per file. The bucket is already provisioned on the project's `main` branch. The media metadata migration and storage credentials must be applied/configured before cloud media uploads are active.
+Jump records and FlySight track data sync to the private Neon account. Photos and videos can be stored in the private `base-jump-media` Neon Object Storage bucket; uploads are limited to 3 MB per file. The private bucket, media metadata table, and production storage credentials are provisioned. Cloud media uploads are implemented; a real signed-in upload/view/delete acceptance test remains outstanding.
 
 ## Requirements
 
@@ -26,7 +26,7 @@ Configure `DATABASE_URL`, `NEON_AUTH_ISSUER`, `NEON_AUTH_JWKS_URL`, and `OPENAI_
 
 ## Database migrations
 
-Apply the SQL migrations in order. For the new private media backend, run `migrations/003_user_media.sql` against the same Neon database after reviewing it. The migration creates only the per-user media metadata table; binary files are stored in Neon Object Storage.
+Database migrations are maintained in `migrations/` and have been applied to the existing Neon production database. Do not create a replacement database. Binary media files are stored in the private Neon Object Storage bucket.
 
 ## FlySight 2
 
