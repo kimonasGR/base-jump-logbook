@@ -182,7 +182,7 @@ test('cloud sync retries transient failures and waits for reconnection while off
   assert.match(ui, /e\.status===408\|\|e\.status===429\|\|e\.status>=500/);
 });
 
-test('local data is backed up before a cloud restore can replace it', () => {
+test('JSON backup import creates a recovery copy before replacing local records', () => {\n  assert.match(ui, /Replace current local data with this backup\\? A recovery copy of the current device data will be created first\\./);\n  assert.match(ui, /backupTime=window\\.createLocalRecoveryBackup\\(\\);db=\\{\\.\\.\\.structuredClone\\(defaults\\),\\.\\.\\.x\\};persist\\(\\);render\\(\\)/);\n  assert.match(ui, /Import cancelled: a safety backup could not be created, so current data was not replaced/);\n});\n\ntest('local data is backed up before a cloud restore can replace it', () => {
   assert.match(ui, /window\.createLocalRecoveryBackup=\(\)=>/);
   assert.match(ui, /baseLogbookRecoveryBackups\.v1/);
   assert.match(ui, /backupTime=window\.createLocalRecoveryBackup\(\)/);
