@@ -157,12 +157,14 @@ test('snapshot writes use optimistic concurrency and reject stale device copies'
   assert.match(handler, /SNAPSHOT_CONFLICT/);
 });
 
-test('frontend pauses cloud sync on conflict and exposes explicit two-way recovery actions', () => {
+test('frontend pauses cloud sync on conflict, resets stale conflict state and exposes two-way recovery', () => {
   assert.match(ui, /cloudUpdatedAt=null/);
   assert.match(ui, /expectedUpdatedAt:cloudUpdatedAt/);
   assert.match(ui, /cloudUpdatedAt=result\.updatedAt/);
   assert.match(ui, /cloudReady=false;syncAgain=false/);
   assert.match(ui, /cloudReady=false;cloudConflict=true;syncAgain=false/);
+  assert.match(ui, /cloudReady=false;cloudConflict=false;syncAgain=false/);
+  assert.match(ui, /cloudConflict=false;cloudReady=true;gate\.style\.display='none'/);
   assert.match(ui, /id="conflictLoadCloud"/);
   assert.match(ui, /id="conflictKeepLocal"/);
   assert.match(ui, /expectedUpdatedAt:latest\.updatedAt\|\|null/);
