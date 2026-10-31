@@ -9,7 +9,7 @@ struct FlySightConnectionView: View {
     @State private var isListing = false
     @State private var downloadingName: String?
     @State private var transferSaveError: String?
-    @State private var apiBaseURL = ""
+    @State private var apiBaseURL = "https://base-jump-logbook.vercel.app"
     @State private var handoffToken = ""
     @State private var uploadStatus = ""
     @State private var isUploading = false
@@ -109,7 +109,7 @@ struct FlySightConnectionView: View {
                 }
 
                 Section("Secure upload to your logbook") {
-                    TextField("Logbook API URL (https://…)", text: $apiBaseURL)
+                    TextField("Logbook address", text: $apiBaseURL)
                         .textInputAutocapitalization(.never)
                         .keyboardType(.URL)
                         .autocorrectionDisabled()
@@ -126,7 +126,7 @@ struct FlySightConnectionView: View {
                     if !uploadStatus.isEmpty {
                         Text(uploadStatus).font(.footnote).foregroundStyle(.secondary)
                     }
-                    Text("Create a temporary handoff token in your signed-in web logbook, then paste the API URL and token here. The token expires after 10 minutes and cannot access your account.")
+                    Text("In your signed-in BASE Logbook, open Settings → FlySight and create a 10-minute token. Paste it here. The app address is pre-filled; the token can upload only FlySight source files and cannot access your account.")
                         .font(.footnote).foregroundStyle(.secondary)
                 }
 
@@ -161,7 +161,7 @@ struct FlySightConnectionView: View {
                 }
 
                 Section {
-                    Text("This is a native iOS integration prototype. Pairing, live telemetry and file transfer must be validated against the exact FlySight firmware and a physical device before operational use.")
+                    Text("FlySight 2 connection and transfer require a compatible device in Idle mode. Verify imported measurements before saving a jump. Hardware compatibility still requires validation on a physical iPhone and FlySight 2.")
                         .font(.footnote).foregroundStyle(.secondary)
                 }
             }
