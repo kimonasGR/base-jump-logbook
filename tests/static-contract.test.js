@@ -447,3 +447,17 @@ test('AI import preview validates row limits, dates, numeric and boolean fields 
   assert.match(ui, /invalid .* value/);
   assert.match(ui, /A maximum of 10,000 jumps/);
 });
+
+
+test('AI logbook import accepts XLSX and extracts text from searchable PDFs server-side', () => {
+  assert.match(server, /import XLSX from 'xlsx'/);
+  assert.match(server, /import pdfParse from 'pdf-parse'/);
+  assert.match(server, /XLSX\.read\(bytes/);
+  assert.match(server, /await pdfParse\(bytes\)/);
+  assert.match(server, /scanned\/image-only PDFs need OCR/);
+  assert.match(server, /express\.json\(\{ limit: '12mb' \}\)/);
+  assert.match(ui, /\.xlsx,\.pdf/);
+  assert.match(ui, /file\.arrayBuffer\(\)/);
+  assert.match(ui, /fileBase64/);
+  assert.match(ui, /8\*1024\*1024/);
+});
