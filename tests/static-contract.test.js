@@ -419,3 +419,22 @@ test('jump media helper text describes private cloud upload rather than local-on
   assert.match(ui, /Photos and videos are uploaded to your private cloud storage when configured/);
   assert.doesNotMatch(ui, /For this prototype, media is stored locally/);
 });
+
+
+test('AI logbook import is selectable before account creation and from Settings', () => {
+  assert.match(ui, /id="firstLoginLogbook"/);
+  assert.match(ui, /id="aiLogbookImport"/);
+  assert.match(ui, /pendingLogbookFile/);
+  assert.match(ui, /await startAiLogbookImport\(firstFile,status\)/);
+});
+
+test('AI logbook import is authenticated, draft-only, reviewed and merged without replacing existing jumps', () => {
+  assert.match(server, /app\.post\('\/api\/logbook\/import-analyze', requireUser/);
+  assert.match(server, /Buffer\.byteLength\(content,'utf8'\)>400000/);
+  assert.match(server, /requiresConfirmation:true,storedFile:false/);
+  assert.match(ui, /showAiImportPreview/);
+  assert.match(ui, /Add jumps to my logbook/);
+  assert.match(ui, /db\.jumps=\[\.\.\.db\.jumps,\.\.\.newJumps\]/);
+  assert.match(ui, /window\.createLocalRecoveryBackup\(\)/);
+  assert.match(ui, /Supported formats: CSV, TSV, TXT and JSON/);
+});
