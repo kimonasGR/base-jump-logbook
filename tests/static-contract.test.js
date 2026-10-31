@@ -378,3 +378,19 @@ test('web logbook can create a handoff token and load verified uploaded chunks i
   assert.match(ui, /crypto\.subtle\.digest\('SHA-256',bytes\)/);
   assert.match(ui, /picker\.dispatchEvent\(new Event\('change'/);
 });
+
+
+test('primary navigation exists only in the fixed bottom bar', () => {
+  assert.match(ui, /<nav class="bottom">/);
+  assert.doesNotMatch(ui, /<div class="tabs" id="tabs">/);
+  assert.doesNotMatch(ui, /<button class="iconbtn" id="settingsTop"/);
+  assert.match(ui, /data-view="logbook"/);
+  assert.match(ui, /data-view="objects"/);
+  assert.match(ui, /data-view="gear"/);
+  assert.match(ui, /data-view="settings"/);
+});
+
+test('jump media helper text describes private cloud upload rather than local-only prototype storage', () => {
+  assert.match(ui, /Photos and videos are uploaded to your private cloud storage when configured/);
+  assert.doesNotMatch(ui, /For this prototype, media is stored locally/);
+});
