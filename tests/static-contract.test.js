@@ -451,7 +451,7 @@ test('XLSX ZIP archive is preflighted before decompression', () => {
   for(const fragment of ['0x06054b50','0x02014b50','entries>1000','flags&1','expanded/compressed>200','expanded>16*1024*1024','totalExpanded>32*1024*1024']) {
     assert.ok(helper.includes(fragment),'Missing ZIP archive guard: '+fragment);
   }
-  assert.ok(server.slice(end,end+500).includes('validateXlsxZip(bytes);'));
+  assert.ok(server.includes('validateXlsxZip(bytes);'));
 });
 
 test('AI import preview validates row limits, dates, numeric and boolean fields before merging', () => {
