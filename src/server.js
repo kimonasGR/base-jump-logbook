@@ -8,7 +8,7 @@ import multer from 'multer';
 import pg from 'pg';
 import { createRemoteJWKSet, jwtVerify } from 'jose';
 import { z } from 'zod';
-import XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 import pdfParse from 'pdf-parse';
 
 const { Pool } = pg;
@@ -165,8 +165,29 @@ app.post('/api/logbook/import-analyze', requireUser, asyncRoute(async (req,res) 
     if(bytes.length>8*1024*1024)return res.status(413).json({error:'Maximum file size is 8 MB.'});
     try {
       if(ext==='xlsx') {
-        const workbook=XLSX.read(bytes,{type:'buffer',cellDates:true});
-        content=workbook.SheetNames.map(name=>'SHEET: '+name+'\\n'+XLSX.utils.sheet_to_csv(workbook.Sheets[name])).join('\\n\\n');
+        const workbook=new ExcelJS.Workbook();
+        await workbook.xlsx.load(bytes);
+        if(workbook.worksheets.length>30)throw new Error('Workbook has too many sheets');
+        let totalCells=0;
+        const sheets=[];
+        for(const sheet of workbook.worksheets) {
+          if(sheet.rowCount>20000||sheet.columnCount>200)throw new Error('Workbook dimensions exceed import limits');
+          const rows=[];
+          sheet.eachRow({includeEmpty:false},row=>{
+            const values=row.values.slice(1).map(cell=>{
+              if(cell&&typeof cell==='object'&&'text' in cell)return String(cell.text??'');
+              if(cell instanceof Date)return cell.toISOString();
+              if(cell==null)return '';
+              if(typeof cell==='object')return JSON.stringify(cell);
+              return String(cell);
+            });
+            totalCells+=values.length;
+            if(totalCells>200000)throw new Error('Workbook contains too many cells');
+            rows.push(values.map(value=>'"'+String(value).replace(/"/g,'""')+'"').join(','));
+          });
+          sheets.push('SHEET: '+sheet.name+'\\n'+rows.join('\\n'));
+        }
+        content=sheets.join('\\n\\n');
       } else {
         const parsed=await pdfParse(bytes);
         content=parsed.text||'';
