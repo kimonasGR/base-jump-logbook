@@ -499,3 +499,18 @@ test('logbook supports duplicating a jump without copying media or FlySight atta
   assert.match(ui, /media:\[\],flysightTrack:null,trackName:''/);
   assert.match(ui, /privateNotes:''/);
 });
+
+test('object database provides map links, editable records, jump history and jump counts', () => {
+  assert.match(ui, /function objectHistory\(o\)/);
+  assert.match(ui, /data-edit-object=/);
+  assert.match(ui, /data-object-history=/);
+  assert.match(ui, /data-use-object=/);
+  assert.match(ui, /https:\/\/www\.google\.com\/maps\/search/);
+  assert.match(ui, /Last jump:/);
+  assert.match(ui, /Jump history/);
+});
+
+test('object form rejects invalid height and duplicate object names within a country', () => {
+  assert.match(ui, /Object height must be a positive number/);
+  assert.match(ui, /An object with this name and country already exists/);
+});
