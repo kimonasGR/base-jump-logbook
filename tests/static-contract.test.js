@@ -162,7 +162,11 @@ test('frontend pauses cloud sync on conflict and exposes explicit two-way recove
   assert.match(ui, /expectedUpdatedAt:cloudUpdatedAt/);
   assert.match(ui, /cloudUpdatedAt=result\.updatedAt/);
   assert.match(ui, /cloudReady=false;syncAgain=false/);
-  assert.match(ui, /cloudReady=false;cloudConflict=true;syncAgain=false/);\n  assert.match(ui, /id="conflictLoadCloud"/);\n  assert.match(ui, /id="conflictKeepLocal"/);\n  assert.match(ui, /expectedUpdatedAt:latest\.updatedAt\|\|null/);\n  assert.match(ui, /const backupTime=window\.createLocalRecoveryBackup\(\)/);
+  assert.match(ui, /cloudReady=false;cloudConflict=true;syncAgain=false/);
+  assert.match(ui, /id="conflictLoadCloud"/);
+  assert.match(ui, /id="conflictKeepLocal"/);
+  assert.match(ui, /expectedUpdatedAt:latest\.updatedAt\|\|null/);
+  assert.match(ui, /const backupTime=window\.createLocalRecoveryBackup\(\)/);
 });
 
 test('HTML contains one application shell and one Neon Auth bootstrap', () => {
@@ -170,7 +174,7 @@ test('HTML contains one application shell and one Neon Auth bootstrap', () => {
   assert.equal((ui.match(/const AUTH_URL=/g) || []).length, 1);
   assert.equal((ui.match(/<script/g) || []).length, 2);
   assert.equal((ui.match(/<\/script>/g) || []).length, 2);
-  assert.ok(ui.endsWith('</body></html>\n'));
+  assert.ok(ui.endsWith('</body></html>\\n'));
 });
 
 test('cloud sync retries transient failures and waits for reconnection while offline', () => {
@@ -182,7 +186,19 @@ test('cloud sync retries transient failures and waits for reconnection while off
   assert.match(ui, /e\.status===408\|\|e\.status===429\|\|e\.status>=500/);
 });
 
-test('erase-all warns about cloud propagation and requires a recovery backup', () => {\n  assert.match(ui, /If cloud sync is active, this empty logbook will also replace the cloud copy/);\n  assert.match(ui, /const backupTime=window\\.createLocalRecoveryBackup\\(\\);localStorage\\.removeItem\\(KEY\\);db=structuredClone\\(defaults\\);persist\\(\\)/);\n  assert.match(ui, /Erase cancelled: a recovery backup could not be created, so no data was removed/);\n});\n\ntest('JSON backup import creates a recovery copy before replacing local records', () => {\n  assert.match(ui, /Replace current local data with this backup\\? A recovery copy of the current device data will be created first\\./);\n  assert.match(ui, /backupTime=window\\.createLocalRecoveryBackup\\(\\);db=\\{\\.\\.\\.structuredClone\\(defaults\\),\\.\\.\\.x\\};persist\\(\\);render\\(\\)/);\n  assert.match(ui, /Import cancelled: a safety backup could not be created, so current data was not replaced/);\n});\n\ntest('local data is backed up before a cloud restore can replace it', () => {
+test('erase-all warns about cloud propagation and requires a recovery backup', () => {
+  assert.match(ui, /If cloud sync is active, this empty logbook will also replace the cloud copy/);
+  assert.match(ui, /const backupTime=window\.createLocalRecoveryBackup\(\);localStorage\.removeItem\(KEY\);db=structuredClone\(defaults\);persist\(\)/);
+  assert.match(ui, /Erase cancelled: a recovery backup could not be created, so no data was removed/);
+});
+
+test('JSON backup import creates a recovery copy before replacing local records', () => {
+  assert.match(ui, /Replace current local data with this backup\? A recovery copy of the current device data will be created first\./);
+  assert.match(ui, /backupTime=window\.createLocalRecoveryBackup\(\);db=\{\.\.\.structuredClone\(defaults\),\.\.\.x\};persist\(\);render\(\)/);
+  assert.match(ui, /Import cancelled: a safety backup could not be created, so current data was not replaced/);
+});
+
+test('local data is backed up before a cloud restore can replace it', () => {
   assert.match(ui, /window\.createLocalRecoveryBackup=\(\)=>/);
   assert.match(ui, /baseLogbookRecoveryBackups\.v1/);
   assert.match(ui, /backupTime=window\.createLocalRecoveryBackup\(\)/);
