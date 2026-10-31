@@ -463,7 +463,7 @@ test('AI logbook import uses bounded ExcelJS parsing and extracts searchable PDF
   assert.match(server, /totalCells>200000/);
   assert.match(server, /await pdfParse\\(bytes\\)/);
   assert.match(server, /if\\(!content\\.trim\\(\\)\\)scannedPdfBase64=binary/);
-  assert.match(server, /type:'input_file',filename:fileName,file_data:`data:application\\/pdf;base64,/);
+  assert.ok(server.includes("type:'input_file',filename:fileName,file_data:`data:application/pdf;base64,"));
   assert.match(server, /express\\.json\\(\\{ limit: '12mb' \\}\\)/);
   assert.match(ui, /\\.xlsx,\\.pdf/);
   assert.match(ui, /file\\.arrayBuffer\\(\\)/);
