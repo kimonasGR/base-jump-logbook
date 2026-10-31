@@ -179,7 +179,7 @@ test('HTML contains one application shell and one Neon Auth bootstrap', () => {
   assert.equal((ui.match(/const AUTH_URL=/g) || []).length, 1);
   assert.equal((ui.match(/<script/g) || []).length, 2);
   assert.equal((ui.match(/<\/script>/g) || []).length, 2);
-  assert.ok(ui.endsWith('</body></html>\\n'));
+  assert.ok(ui.trimEnd().endsWith('</body></html>'));
 });
 
 test('cloud sync retries transient failures and waits for reconnection while offline', () => {
