@@ -8,6 +8,8 @@ import multer from 'multer';
 import pg from 'pg';
 import { createRemoteJWKSet, jwtVerify } from 'jose';
 import { z } from 'zod';
+import XLSX from 'xlsx';
+import pdfParse from 'pdf-parse';
 
 const { Pool } = pg;
 const app = express();
@@ -24,7 +26,7 @@ const s3 = mediaStorageConfigured ? new S3Client({ region: process.env.AWS_REGIO
 app.disable('x-powered-by');
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
 app.use(cors({ origin: process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(',').map(s => s.trim()) : false, credentials: true }));
-app.use(express.json({ limit: '5mb' }));
+app.use(express.json({ limit: '12mb' }));
 
 const asyncRoute = fn => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 
@@ -152,11 +154,27 @@ const voiceFields = {
 app.post('/api/logbook/import-analyze', requireUser, asyncRoute(async (req,res) => {
   if (!process.env.OPENAI_API_KEY) return res.status(503).json({error:'AI logbook import is not configured. Set OPENAI_API_KEY on the server.'});
   const fileName=String(req.body?.fileName||'logbook').slice(0,160);
-  const content=typeof req.body?.content==='string'?req.body.content:'';
-  if (!content.trim()) return res.status(400).json({error:'The selected file is empty or unreadable.'});
-  if (Buffer.byteLength(content,'utf8')>400000) return res.status(413).json({error:'For this import, the readable file content must be 400 KB or smaller.'});
   const ext=fileName.toLowerCase().split('.').pop();
-  if (!['csv','tsv','txt','json'].includes(ext)) return res.status(415).json({error:'Supported formats for AI import: CSV, TSV, TXT and JSON. Export Excel or PDF to CSV first.'});
+  const binary=typeof req.body?.fileBase64==='string'?req.body.fileBase64:'';
+  let content=typeof req.body?.content==='string'?req.body.content:'';
+  if (!['csv','tsv','txt','json','xlsx','pdf'].includes(ext)) return res.status(415).json({error:'Supported formats: CSV, TSV, TXT, JSON, XLSX and text-based PDF.'});
+  if (['xlsx','pdf'].includes(ext)) {
+    if (!binary || binary.length>11200000 || !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(binary)) return res.status(400).json({error:'The uploaded file encoding is invalid or too large (8 MB maximum).'});
+    const bytes=Buffer.from(binary,'base64');
+    if(bytes.length>8*1024*1024)return res.status(413).json({error:'Maximum file size is 8 MB.'});
+    try {
+      if(ext==='xlsx') {
+        const workbook=XLSX.read(bytes,{type:'buffer',cellDates:true});
+        content=workbook.SheetNames.map(name=>'SHEET: '+name+'\\n'+XLSX.utils.sheet_to_csv(workbook.Sheets[name])).join('\\n\\n');
+      } else {
+        const parsed=await pdfParse(bytes);
+        content=parsed.text||'';
+        if(!content.trim())return res.status(422).json({error:'This PDF has no selectable text. Scanned/image-only PDFs need OCR and are not supported yet.'});
+      }
+    } catch(parseError) { console.error('Logbook file parsing failed',parseError?.message);return res.status(422).json({error:ext==='pdf'?'Could not extract text from this PDF.':'Could not read this Excel workbook.'}); }
+  }
+  if (!content.trim()) return res.status(400).json({error:'The selected file is empty or unreadable.'});
+  if (Buffer.byteLength(content,'utf8')>600000) return res.status(413).json({error:'Extracted text is larger than 600 KB. Split the logbook into smaller files.'});
   const instructions = `You are converting an existing BASE jumping logbook into a draft for another BASE jump logbook app. Source filename: ${fileName}.
 Read the supplied source data, infer column/header meaning from names and sample values, and map records to the destination fields below. Return JSON only with shape {"jumps":[...],"mappingSummary":[...],"warnings":[...]}.
 Each jump may contain: number, objectName, country, date, time, height, heightUnit ("m" or "ft"), objectType ("B","A","S","E","Other"), otherType, latitude, longitude, sliderConfiguration, pilotChute, suit, summitOsp, rig, jumpType, exitManoeuvre, deploymentMethod, windStrength, windDirection, delay, delaySu, openingAltitude, openingAltitudeLoss, openingDirection, offHeading, correction, brakeSetting, skyCover, lighting, privateNotes, beautifulPeople, uncertainFields.
