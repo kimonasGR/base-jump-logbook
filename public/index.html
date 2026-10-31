@@ -258,7 +258,7 @@ window.cloudSync=()=>{if(cloudReady)syncCloud()};
 // Retry a locally saved snapshot after connectivity returns or the app is reopened.
 window.addEventListener('online',()=>{if(syncRetryTimer){clearTimeout(syncRetryTimer);syncRetryTimer=null}if(cloudReady)syncCloud()});
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&cloudReady){if(syncRetryTimer){clearTimeout(syncRetryTimer);syncRetryTimer=null}syncCloud()}});
-window.signOutLogbook=async()=>{try{await auth.signOut();cloudReady=false;bearer=null;cloudUpdatedAt=null;if(syncRetryTimer){clearTimeout(syncRetryTimer);syncRetryTimer=null}syncRetryAttempt=0;gate.style.display='flex';status.textContent='Signed out';errorBox.textContent='';}catch(e){showError(e)}};
+window.signOutLogbook=async()=>{try{await auth.signOut();cloudReady=false;cloudConflict=false;syncAgain=false;bearer=null;cloudUpdatedAt=null;if(syncRetryTimer){clearTimeout(syncRetryTimer);syncRetryTimer=null}syncRetryAttempt=0;gate.style.display='flex';status.textContent='Signed out';errorBox.textContent='';}catch(e){showError(e)}};
 async function enterApp(){
   const session=await auth.getSession();
   if(!session?.data?.user&&!session?.user)throw Error('No active session.');
@@ -279,7 +279,7 @@ async function enterApp(){
     const initial=await api('/api/snapshot',{method:'PUT',body:JSON.stringify({...window.getLocalSnapshot(),expectedUpdatedAt:null})});
     cloudUpdatedAt=initial.updatedAt;
   }
-  cloudReady=true;gate.style.display='none';
+  cloudConflict=false;cloudReady=true;gate.style.display='none';
   const email=session.data?.user?.email||session.user?.email||'Signed in';
   status.textContent='Cloud sync active · '+email;
 }
