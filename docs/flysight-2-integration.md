@@ -35,8 +35,9 @@ The protocol documentation specifies Go-Back-N with a window of eight packets an
 2. User switches the FlySight to Idle mode (LED off).
 3. App lists the device directory and user selects `TRACK.CSV` and `SENSOR.CSV`.
 4. App downloads the files without modifying or deleting the originals.
-5. The downloaded files are selected together and shared from iOS; the user completes the handoff by choosing both files in the web logbook's existing file import UI. A zero-touch direct handoff into an authenticated web session remains to be implemented.
-6. The user reviews the track and sensor summaries before attaching them to a jump.
+5. In the signed-in web logbook, create a one-time FlySight token from Settings. In the iOS app, paste the token (the production API URL is pre-filled) and upload the selected files over HTTPS in 256 KiB chunks. The server verifies the declared SHA-256 before making files visible to the same account.
+6. In the web logbook, open a new jump and use **Load FlySight inbox**. The browser downloads and independently verifies every chunk, passes the source files into the existing TRACK/SENSOR import parser, and shows the track and sensor summary for review. The user saves the jump only after checking the draft.
+7. Delete the temporary inbox handoff from the jump form after import; the saved jump retains its imported track data and source-file fingerprints.
 
 ## Known gaps before release
 
@@ -44,7 +45,7 @@ The protocol documentation specifies Go-Back-N with a window of eight packets an
 - Validate secure pairing, device discovery and mode values on actual iPhone/FlySight hardware.
 - Confirm directory path conventions and packet offsets using real device responses.
 - Implement robust Go-Back-N retransmission/window handling and MTU negotiation; test interrupted and large downloads.
-- Connect downloaded file handoff to the existing web app import flow.
+- Validate the complete upload → inbox → browser verification → import-review workflow using a signed-in account.
 - Add automated iOS build/device tests.
 
 ## Safety and data integrity
@@ -61,4 +62,4 @@ The protocol documentation specifies Go-Back-N with a window of eight packets an
 
 The API now supports short-lived (10-minute), random upload-only handoff tokens. Only a SHA-256 digest is stored in PostgreSQL; the token itself is returned once to the authenticated browser and is never a Neon Auth credential. The native uploader can send only TRACK.CSV, SENSOR.CSV or TRACK.GPX, split into 256 KiB chunks, with a 15 MiB per-file ceiling and declared SHA-256 metadata. The authenticated web account can list completed files and retrieve individual chunks; every read is scoped to the owning user. Expired sessions and files cascade-delete through the migration schema.
 
-Apply `migrations/002_flysight_handoff.sql` to the existing Neon database before enabling this flow. The current web and iOS screens still use the manual share-sheet path until their token pairing, chunk upload, and import-inbox UI are connected.
+Apply `migrations/002_flysight_handoff.sql` to the existing Neon database before enabling this flow. The native iOS screen and web Settings/import form now expose the one-time token, chunk upload, and import-inbox workflow. The optional iOS share sheet remains available as a manual fallback.
