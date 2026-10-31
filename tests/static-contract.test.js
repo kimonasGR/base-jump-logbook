@@ -432,6 +432,9 @@ test('AI logbook import is authenticated, draft-only, reviewed and merged withou
   assert.match(server, /app\.post\('\/api\/logbook\/import-analyze', requireUser/);
   assert.match(server, /Buffer\.byteLength\(content,'utf8'\)>600000/);
   assert.match(server, /requiresConfirmation:true,storedFile:false/);
+  assert.match(server, /draft\.jumps\.length>10000/);
+  assert.match(server, /Split the source file into smaller files/);
+  assert.match(server, /Array\.isArray\(draft\.mappingSummary\)/);
   assert.match(ui, /showAiImportPreview/);
   assert.match(ui, /Add jumps to my logbook/);
   assert.match(ui, /db\.jumps=\[\.\.\.db\.jumps,\.\.\.newJumps\]/);
