@@ -452,16 +452,21 @@ test('AI import preview validates row limits, dates, numeric and boolean fields 
 });
 
 
-test('AI logbook import accepts XLSX and extracts text from searchable PDFs server-side', () => {
-  assert.match(server, /import XLSX from 'xlsx'/);
+test('AI logbook import uses bounded ExcelJS parsing and extracts searchable PDFs server-side', () => {
+  assert.match(server, /import ExcelJS from 'exceljs'/);
+  assert.doesNotMatch(server, /from 'xlsx'/);
   assert.match(server, /import pdfParse from 'pdf-parse'/);
-  assert.match(server, /XLSX\.read\(bytes/);
-  assert.match(server, /await pdfParse\(bytes\)/);
-  assert.match(server, /if\(!content\.trim\(\)\)scannedPdfBase64=binary/);
-  assert.match(server, /type:'input_file',filename:fileName,file_data:`data:application\/pdf;base64,/);
-  assert.match(server, /express\.json\(\{ limit: '12mb' \}\)/);
-  assert.match(ui, /\.xlsx,\.pdf/);
-  assert.match(ui, /file\.arrayBuffer\(\)/);
+  assert.match(server, /new ExcelJS\\.Workbook\\(\\)/);
+  assert.match(server, /await workbook\\.xlsx\\.load\\(bytes\\)/);
+  assert.match(server, /workbook\\.worksheets\\.length>30/);
+  assert.match(server, /sheet\\.rowCount>20000\\|\\|sheet\\.columnCount>200/);
+  assert.match(server, /totalCells>200000/);
+  assert.match(server, /await pdfParse\\(bytes\\)/);
+  assert.match(server, /if\\(!content\\.trim\\(\\)\\)scannedPdfBase64=binary/);
+  assert.match(server, /type:'input_file',filename:fileName,file_data:`data:application\\/pdf;base64,/);
+  assert.match(server, /express\\.json\\(\\{ limit: '12mb' \\}\\)/);
+  assert.match(ui, /\\.xlsx,\\.pdf/);
+  assert.match(ui, /file\\.arrayBuffer\\(\\)/);
   assert.match(ui, /fileBase64/);
-  assert.match(ui, /8\*1024\*1024/);
+  assert.match(ui, /8\\*1024\\*1024/);
 });
