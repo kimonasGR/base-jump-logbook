@@ -281,7 +281,7 @@ app.put('/api/snapshot', requireUser, asyncRoute(async (req,res) => {
   const body = z.object({ ...snapshotSchema.shape, expectedUpdatedAt: z.string().datetime({ offset:true }).nullable().optional() }).strict().parse(req.body);
   const { expectedUpdatedAt = null, ...snapshot } = body;
   const r = await pool.query(
-    `INSERT INTO user_snapshots(user_id,payload,updated_at) VALUES($1,$2::jsonb,date_trunc('milliseconds',now())) ON CONFLICT(user_id) DO UPDATE SET payload=EXCLUDED.payload,updated_at=GREATEST(date_trunc('milliseconds',clock_timestamp()),user_snapshots.updated_at + interval '1 millisecond') WHERE user_snapshots.updated_at=$3::timestamptz RETURNING updated_at`,
+    `INSERT INTO user_snapshots(user_id,payload,updated_at) SELECT $1,$2::jsonb,date_trunc('milliseconds',clock_timestamp()) WHERE (($3::timestamptz IS NULL AND NOT EXISTS (SELECT 1 FROM user_snapshots WHERE user_id=$1)) OR ($3::timestamptz IS NOT NULL AND EXISTS (SELECT 1 FROM user_snapshots WHERE user_id=$1))) ON CONFLICT(user_id) DO UPDATE SET payload=EXCLUDED.payload,updated_at=GREATEST(date_trunc('milliseconds',clock_timestamp()),user_snapshots.updated_at + interval '1 millisecond') WHERE user_snapshots.updated_at=$3::timestamptz RETURNING updated_at`,
     [req.user.id, JSON.stringify(snapshot), expectedUpdatedAt]
   );
   if (!r.rowCount) {
