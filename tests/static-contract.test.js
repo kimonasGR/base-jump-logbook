@@ -157,12 +157,12 @@ test('snapshot writes use optimistic concurrency and reject stale device copies'
   assert.match(handler, /SNAPSHOT_CONFLICT/);
 });
 
-test('frontend pauses cloud sync on conflict and tracks the acknowledged cloud version', () => {
+test('frontend pauses cloud sync on conflict and exposes explicit two-way recovery actions', () => {
   assert.match(ui, /cloudUpdatedAt=null/);
   assert.match(ui, /expectedUpdatedAt:cloudUpdatedAt/);
   assert.match(ui, /cloudUpdatedAt=result\.updatedAt/);
   assert.match(ui, /cloudReady=false;syncAgain=false/);
-  assert.match(ui, /status\.textContent='Sync paused: cloud changed on another device/);
+  assert.match(ui, /cloudReady=false;cloudConflict=true;syncAgain=false/);\n  assert.match(ui, /id="conflictLoadCloud"/);\n  assert.match(ui, /id="conflictKeepLocal"/);\n  assert.match(ui, /expectedUpdatedAt:latest\.updatedAt\|\|null/);\n  assert.match(ui, /const backupTime=window\.createLocalRecoveryBackup\(\)/);
 });
 
 test('HTML contains one application shell and one Neon Auth bootstrap', () => {
