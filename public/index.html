@@ -202,13 +202,13 @@ function showAiImportPreview(draft,fileName,statusTarget){
     const button=overlay.querySelector('#aiImportConfirm'),msg=overlay.querySelector('#aiImportReviewStatus');
     try{
       const edited=JSON.parse(overlay.querySelector('#aiImportJson').value);
-      if(!Array.isArray(edited.jumps)||!edited.jumps.length)throw Error('Preview must contain at least one jump.');
+      if(!Array.isArray(edited.jumps)||!edited.jumps.length)throw Error('Preview must contain at least one jump.');if(edited.jumps.length>10000)throw Error('A maximum of 10,000 jumps can be imported at once. Split the file and retry.');
       const allowed=['number','objectName','country','date','time','height','heightUnit','objectType','otherType','latitude','longitude','sliderConfiguration','pilotChute','suit','summitOsp','rig','jumpType','exitManoeuvre','deploymentMethod','windStrength','windDirection','delay','delaySu','openingAltitude','openingAltitudeLoss','openingDirection','offHeading','correction','brakeSetting','skyCover','lighting','privateNotes','beautifulPeople'];
       const clean=v=>v===null||v===undefined?'':typeof v==='string'?v.trim():v;
       const normalized=edited.jumps.map((raw,index)=>{
         if(!raw||typeof raw!=='object'||Array.isArray(raw))throw Error('Jump '+(index+1)+' is not an object.');
         const jump={};for(const key of allowed)if(Object.prototype.hasOwnProperty.call(raw,key))jump[key]=clean(raw[key]);
-        if(!jump.objectName)throw Error('Jump '+(index+1)+' has no object name. Add one in the preview before importing.');
+        if(!jump.objectName)throw Error('Jump '+(index+1)+' has no object name. Add one in the preview before importing.');if(jump.date&&!/^\\d{4}-\\d{2}-\\d{2}$/.test(String(jump.date))&&!/^\\d{4}-\\d{2}-\\d{2}T/.test(String(jump.date)))throw Error('Jump '+(index+1)+' has an invalid date. Use YYYY-MM-DD or an ISO date-time.');for(const key of ['height','latitude','longitude','windStrength','delay','delaySu','openingAltitude','openingAltitudeLoss'])if(jump[key]!==''&&jump[key]!==undefined&&jump[key]!==null&&!Number.isFinite(Number(jump[key])))throw Error('Jump '+(index+1)+' has a non-numeric '+key+'.');for(const key of ['offHeading','correction'])if(jump[key]!==''&&jump[key]!==undefined&&jump[key]!==null&&typeof jump[key]!=='boolean')throw Error('Jump '+(index+1)+' has an invalid '+key+' value.');
         if(!['B','A','S','E','Other',''].includes(jump.objectType||''))jump.objectType='';
         return jump;
       });
