@@ -430,13 +430,13 @@ test('AI logbook import is selectable before account creation and from Settings'
 
 test('AI logbook import is authenticated, draft-only, reviewed and merged without replacing existing jumps', () => {
   assert.match(server, /app\.post\('\/api\/logbook\/import-analyze', requireUser/);
-  assert.match(server, /Buffer\.byteLength\(content,'utf8'\)>400000/);
+  assert.match(server, /Buffer\.byteLength\(content,'utf8'\)>600000/);
   assert.match(server, /requiresConfirmation:true,storedFile:false/);
   assert.match(ui, /showAiImportPreview/);
   assert.match(ui, /Add jumps to my logbook/);
   assert.match(ui, /db\.jumps=\[\.\.\.db\.jumps,\.\.\.newJumps\]/);
   assert.match(ui, /window\.createLocalRecoveryBackup\(\)/);
-  assert.match(ui, /Supported formats: CSV, TSV, TXT and JSON/);
+  assert.match(ui, /Supported formats: CSV, TSV, TXT, JSON, XLSX and text-based PDF/);
 });
 
 
@@ -454,7 +454,7 @@ test('AI logbook import accepts XLSX and extracts text from searchable PDFs serv
   assert.match(server, /import pdfParse from 'pdf-parse'/);
   assert.match(server, /XLSX\.read\(bytes/);
   assert.match(server, /await pdfParse\(bytes\)/);
-  assert.match(server, /scanned\/image-only PDFs need OCR/);
+  assert.match(server, /if\(!content\.trim\(\)\)scannedPdfBase64=binary/);\n  assert.match(server, /type:'input_file',filename:fileName,file_data:`data:application\/pdf;base64,/);
   assert.match(server, /express\.json\(\{ limit: '12mb' \}\)/);
   assert.match(ui, /\.xlsx,\.pdf/);
   assert.match(ui, /file\.arrayBuffer\(\)/);
