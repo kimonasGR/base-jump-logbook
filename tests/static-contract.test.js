@@ -453,18 +453,20 @@ test('AI import preview validates row limits, dates, numeric and boolean fields 
 
 
 test('AI logbook import uses bounded ExcelJS parsing and extracts searchable PDFs server-side', () => {
-  assert.match(server, /import ExcelJS from 'exceljs'/);
+  assert.ok(server.includes("import ExcelJS from 'exceljs'"));
   assert.doesNotMatch(server, /from 'xlsx'/);
-  assert.match(server, /import pdfParse from 'pdf-parse'/);
-  assert.match(server, /new ExcelJS\\.Workbook\\(\\)/);
-  assert.match(server, /await workbook\\.xlsx\\.load\\(bytes\\)/);
-  assert.match(server, /workbook\\.worksheets\\.length>30/);
-  assert.match(server, /sheet\\.rowCount>20000\\|\\|sheet\\.columnCount>200/);
-  assert.match(server, /totalCells>200000/);
-  assert.match(server, /await pdfParse\\(bytes\\)/);
-  assert.match(server, /if\\(!content\\.trim\\(\\)\\)scannedPdfBase64=binary/);
-  assert.ok(server.includes("type:'input_file',filename:fileName,file_data:`data:application/pdf;base64,"));
-  assert.match(server, /express\\.json\\(\\{ limit: '12mb' \\}\\)/);
+  assert.ok(server.includes("import pdfParse from 'pdf-parse'"));
+  for (const fragment of [
+    'new ExcelJS.Workbook()',
+    'await workbook.xlsx.load(bytes)',
+    'workbook.worksheets.length>30',
+    'sheet.rowCount>20000||sheet.columnCount>200',
+    'totalCells>200000',
+    'await pdfParse(bytes)',
+    'if(!content.trim())scannedPdfBase64=binary',
+    "type:'input_file',filename:fileName,file_data:`data:application/pdf;base64,",
+    "express.json({ limit: '12mb' })"
+  ]) assert.ok(server.includes(fragment), 'Missing parser contract: '+fragment);
   assert.match(ui, /\\.xlsx,\\.pdf/);
   assert.match(ui, /file\\.arrayBuffer\\(\\)/);
   assert.match(ui, /fileBase64/);
