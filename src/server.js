@@ -186,7 +186,9 @@ Use only values supported by source. Unknown fields must be null; never fabricat
   if(!outputText)return res.status(502).json({error:'AI returned no import preview.'});
   let draft;try{draft=JSON.parse(outputText)}catch{return res.status(502).json({error:'AI returned an unreadable import preview.'});}
   if(!draft||!Array.isArray(draft.jumps))return res.status(502).json({error:'AI preview has an invalid structure.'});
-  draft.jumps=draft.jumps.slice(0,10000);
+  if(draft.jumps.length>10000)return res.status(413).json({error:'The AI found more than 10,000 jump records. Split the source file into smaller files; no preview was created.'});
+  draft.mappingSummary=Array.isArray(draft.mappingSummary)?draft.mappingSummary.slice(0,100).map(x=>String(x).slice(0,1000)):[];
+  draft.warnings=Array.isArray(draft.warnings)?draft.warnings.slice(0,100).map(x=>String(x).slice(0,1000)):[];
   res.json({draft,requiresConfirmation:true,storedFile:false});
 }));
 
