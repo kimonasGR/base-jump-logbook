@@ -438,3 +438,12 @@ test('AI logbook import is authenticated, draft-only, reviewed and merged withou
   assert.match(ui, /window\.createLocalRecoveryBackup\(\)/);
   assert.match(ui, /Supported formats: CSV, TSV, TXT and JSON/);
 });
+
+
+test('AI import preview validates row limits, dates, numeric and boolean fields before merging', () => {
+  assert.match(ui, /edited\.jumps\.length>10000/);
+  assert.match(ui, /invalid date/);
+  assert.match(ui, /non-numeric/);
+  assert.match(ui, /invalid .* value/);
+  assert.match(ui, /A maximum of 10,000 jumps/);
+});
