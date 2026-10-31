@@ -110,6 +110,7 @@ test('jump media uses private Neon Object Storage with user-scoped metadata', ()
 
 test('jump media uploads preserve local copies and sync only private media metadata', () => {
   assert.match(ui, /window\.uploadCloudMedia=async\(jumpId,items\)/);
+  assert.match(ui, /items\.filter\(item=>item\.storageId&&!item\.data\)/);
   assert.match(ui, /window\.loadCloudMedia=async\(items\)/);
   assert.match(ui, /window\.deleteCloudMedia=async\(id\)/);
   assert.match(ui, /Promise\.allSettled\(uploaded\.map\(item=>window\.deleteCloudMedia\(item\.storageId\)\)\)/);
