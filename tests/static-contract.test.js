@@ -457,7 +457,8 @@ test('AI logbook import accepts XLSX and extracts text from searchable PDFs serv
   assert.match(server, /import pdfParse from 'pdf-parse'/);
   assert.match(server, /XLSX\.read\(bytes/);
   assert.match(server, /await pdfParse\(bytes\)/);
-  assert.match(server, /if\(!content\.trim\(\)\)scannedPdfBase64=binary/);\n  assert.match(server, /type:'input_file',filename:fileName,file_data:`data:application\/pdf;base64,/);
+  assert.match(server, /if\(!content\.trim\(\)\)scannedPdfBase64=binary/);
+  assert.match(server, /type:'input_file',filename:fileName,file_data:`data:application\/pdf;base64,/);
   assert.match(server, /express\.json\(\{ limit: '12mb' \}\)/);
   assert.match(ui, /\.xlsx,\.pdf/);
   assert.match(ui, /file\.arrayBuffer\(\)/);
