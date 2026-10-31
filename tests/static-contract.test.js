@@ -112,6 +112,8 @@ test('jump media uploads preserve local copies and sync only private media metad
   assert.match(ui, /window\.uploadCloudMedia=async\(jumpId,items\)/);
   assert.match(ui, /window\.loadCloudMedia=async\(items\)/);
   assert.match(ui, /window\.deleteCloudMedia=async\(id\)/);
+  assert.match(ui, /Promise\.allSettled\(uploaded\.map\(item=>window\.deleteCloudMedia\(item\.storageId\)\)\)/);
+  assert.match(ui, /could not be rolled back/);
   assert.match(ui, /storageId:m\.storageId,name:m\.name,type:m\.type,sizeBytes:m\.sizeBytes/);
   assert.match(ui, /media:\(j\.media\|\|\[\]\)\.map\(\(\{url,\.\.\.m\}\)=>m\)/);
   assert.match(ui, /Photos and videos upload to private Neon storage when configured/);
