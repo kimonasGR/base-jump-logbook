@@ -151,6 +151,9 @@ test('snapshot writes use optimistic concurrency and reject stale device copies'
   const end = server.indexOf("\n\napp.use((err", start);
   const handler = server.slice(start, end);
   assert.match(handler, /expectedUpdatedAt/);
+  assert.match(handler, /INSERT INTO user_snapshots\(user_id,payload,updated_at\) SELECT \$1/);
+  assert.match(handler, /\$3::timestamptz IS NULL AND NOT EXISTS \(SELECT 1 FROM user_snapshots WHERE user_id=\$1\)/);
+  assert.match(handler, /\$3::timestamptz IS NOT NULL AND EXISTS \(SELECT 1 FROM user_snapshots WHERE user_id=\$1\)/);
   assert.match(handler, /WHERE user_snapshots\.updated_at=\$3::timestamptz/);
   assert.match(handler, /GREATEST\(date_trunc\('milliseconds',clock_timestamp\(\)\),user_snapshots\.updated_at \+ interval '1 millisecond'\)/);
   assert.match(handler, /res\.status\(409\)/);
