@@ -207,7 +207,7 @@ window.uploadCloudMedia=async(jumpId,items)=>{
 };
 window.loadCloudMedia=async(items)=>{
   if(!bearer)throw Error('Sign in to load private attachments.');
-  await Promise.all(items.filter(item=>item.storageId&&!item.data&&!item.url).map(async item=>{
+  await Promise.all(items.filter(item=>item.storageId&&!item.data).map(async item=>{
     const result=await api('/api/media/'+encodeURIComponent(item.storageId)+'/url');
     item.url=result.url;
   }));
