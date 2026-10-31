@@ -151,6 +151,33 @@ const voiceFields = {
     object_name:{type:['string','null']}, country:{type:['string','null']}, latitude:{type:['number','null']}, longitude:{type:['number','null']}, height_m:{type:['number','null']}, object_type:{type:['string','null'],enum:['B','A','S','E','Other',null]}, object_type_other:{type:['string','null']}, date_time:{type:['string','null']}, slider_configuration:{type:['string','null']}, pilot_chute:{type:['string','null']}, suit:{type:['string','null']}, summit_osp:{type:['string','null']}, rig:{type:['string','null']}, jump_type:{type:['string','null']}, wind_strength:{type:['number','null']}, wind_direction:{type:['string','null']}, delay_seconds:{type:['number','null']}, delay_for_su_seconds:{type:['number','null']}, exit_manoeuvre:{type:['string','null']}, off_heading:{type:['boolean','null']}, correction:{type:['boolean','null']}, brake_setting:{type:['string','null']}, sky_cover:{type:['string','null']}, lighting:{type:['string','null']}, private_notes:{type:['string','null']}, beautiful_people_around:{type:['string','null']}, deployment_method:{type:['string','null']}, opening_direction_degrees:{type:['integer','null']}, opening_direction_side:{type:['string','null'],enum:['L','R','C',null]}, uncertain_fields:{type:'array',items:{type:'string'}}, transcript:{type:'string'}
   }, required:['object_name','country','latitude','longitude','height_m','object_type','object_type_other','date_time','slider_configuration','pilot_chute','suit','summit_osp','rig','jump_type','wind_strength','wind_direction','delay_seconds','delay_for_su_seconds','exit_manoeuvre','off_heading','correction','brake_setting','sky_cover','lighting','private_notes','beautiful_people_around','deployment_method','opening_direction_degrees','opening_direction_side','uncertain_fields','transcript']
 };
+function validateXlsxZip(bytes) {
+  const minEocd=22, maxComment=65535;
+  let eocd=-1;
+  for(let i=bytes.length-minEocd;i>=Math.max(0,bytes.length-minEocd-maxComment);i--) {
+    if(bytes.readUInt32LE(i)===0x06054b50 && i+minEocd+bytes.readUInt16LE(i+20)===bytes.length) { eocd=i; break; }
+  }
+  if(eocd<0) throw new Error('Invalid XLSX ZIP directory');
+  const disk=bytes.readUInt16LE(eocd+4), directoryDisk=bytes.readUInt16LE(eocd+6);
+  const diskEntries=bytes.readUInt16LE(eocd+8), entries=bytes.readUInt16LE(eocd+10);
+  const directorySize=bytes.readUInt32LE(eocd+12), directoryOffset=bytes.readUInt32LE(eocd+16);
+  if(disk||directoryDisk||diskEntries!==entries||entries===0xffff||directorySize===0xffffffff||directoryOffset===0xffffffff) throw new Error('Multi-disk and ZIP64 workbooks are not supported');
+  if(entries<1||entries>1000||directoryOffset+directorySize>eocd) throw new Error('XLSX archive directory exceeds limits');
+  let offset=directoryOffset, totalExpanded=0;
+  for(let n=0;n<entries;n++) {
+    if(offset+46>eocd||bytes.readUInt32LE(offset)!==0x02014b50) throw new Error('Invalid XLSX archive entry');
+    const flags=bytes.readUInt16LE(offset+8), compressed=bytes.readUInt32LE(offset+20), expanded=bytes.readUInt32LE(offset+24);
+    const nameLength=bytes.readUInt16LE(offset+28), extraLength=bytes.readUInt16LE(offset+30), commentLength=bytes.readUInt16LE(offset+32);
+    if(flags&1||compressed===0xffffffff||expanded===0xffffffff) throw new Error('Encrypted and ZIP64 XLSX entries are not supported');
+    const next=offset+46+nameLength+extraLength+commentLength;
+    if(next>eocd||next>directoryOffset+directorySize) throw new Error('Invalid XLSX archive entry bounds');
+    if(expanded>16*1024*1024||(expanded>0&&(compressed===0||expanded/compressed>200))) throw new Error('XLSX archive compression ratio or entry size exceeds limits');
+    totalExpanded+=expanded;
+    if(totalExpanded>32*1024*1024) throw new Error('XLSX expanded size exceeds 32 MB');
+    offset=next;
+  }
+  if(offset!==directoryOffset+directorySize) throw new Error('Invalid XLSX archive directory size');
+}
 app.post('/api/logbook/import-analyze', requireUser, asyncRoute(async (req,res) => {
   if (!process.env.OPENAI_API_KEY) return res.status(503).json({error:'AI logbook import is not configured. Set OPENAI_API_KEY on the server.'});
   const fileName=String(req.body?.fileName||'logbook').slice(0,160);
@@ -165,6 +192,7 @@ app.post('/api/logbook/import-analyze', requireUser, asyncRoute(async (req,res) 
     if(bytes.length>8*1024*1024)return res.status(413).json({error:'Maximum file size is 8 MB.'});
     try {
       if(ext==='xlsx') {
+        validateXlsxZip(bytes);
         const workbook=new ExcelJS.Workbook();
         await workbook.xlsx.load(bytes);
         if(workbook.worksheets.length>30)throw new Error('Workbook has too many sheets');
