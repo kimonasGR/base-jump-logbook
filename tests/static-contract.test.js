@@ -467,8 +467,8 @@ test('AI logbook import uses bounded ExcelJS parsing and extracts searchable PDF
     "type:'input_file',filename:fileName,file_data:`data:application/pdf;base64,",
     "express.json({ limit: '12mb' })"
   ]) assert.ok(server.includes(fragment), 'Missing parser contract: '+fragment);
-  assert.match(ui, /\\.xlsx,\\.pdf/);
-  assert.match(ui, /file\\.arrayBuffer\\(\\)/);
+  assert.ok(ui.includes('.xlsx,.pdf'));
+  assert.ok(ui.includes('file.arrayBuffer()'));
   assert.match(ui, /fileBase64/);
-  assert.match(ui, /8\\*1024\\*1024/);
+  assert.ok(ui.includes('8*1024*1024'));
 });
