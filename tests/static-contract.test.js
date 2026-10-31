@@ -443,6 +443,17 @@ test('AI logbook import is authenticated, draft-only, reviewed and merged withou
 });
 
 
+test('XLSX ZIP archive is preflighted before decompression', () => {
+  const start=server.indexOf('function validateXlsxZip(bytes)');
+  const end=server.indexOf("app.post('/api/logbook/import-analyze'",start);
+  const helper=server.slice(start,end);
+  assert.ok(start>=0&&end>start);
+  for(const fragment of ['0x06054b50','0x02014b50','entries>1000','flags&1','expanded/compressed>200','expanded>16*1024*1024','totalExpanded>32*1024*1024']) {
+    assert.ok(helper.includes(fragment),'Missing ZIP archive guard: '+fragment);
+  }
+  assert.ok(server.slice(end,end+500).includes('validateXlsxZip(bytes);'));
+});
+
 test('AI import preview validates row limits, dates, numeric and boolean fields before merging', () => {
   assert.match(ui, /edited\.jumps\.length>10000/);
   assert.match(ui, /invalid date/);
