@@ -82,7 +82,7 @@ struct FlySightConnectionView: View {
                         Text("Switch FlySight to Idle mode (LED off), connect, then read the device directory.")
                             .font(.footnote).foregroundStyle(.secondary)
                     }
-                    ForEach(files.filter { $0.name.uppercased().hasSuffix(".CSV") }) { file in
+                    ForEach(files.filter { let name = $0.name.uppercased(); return name.hasSuffix(".CSV") || name.hasSuffix(".GPX") }) { file in
                         HStack {
                             VStack(alignment: .leading) {
                                 Text(file.name)
