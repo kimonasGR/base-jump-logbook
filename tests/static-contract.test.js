@@ -514,3 +514,13 @@ test('object form rejects invalid height and duplicate object names within a cou
   assert.match(ui, /Object height must be a positive number/);
   assert.match(ui, /An object with this name and country already exists/);
 });
+
+
+test('weather conditions use structured sky, lighting, wind strength and compass wind direction fields', () => {
+  assert.match(ui, /04 · Conditions[\s\S]*selectField\('Sky cover','skyCover'/);
+  assert.match(ui, /selectField\('Lighting','lighting'/);
+  assert.match(ui, /selectField\('Wind strength','windStrength',j\.windStrength,'Wind strength'\)/);
+  assert.match(ui, /selectField\('Wind direction','windDirection',j\.windDirection,'windDirection'\)/);
+  assert.match(ui, /windDirection:\['N','NE','E','SE','S','SW','W','NW','Variable'\]/);
+  assert.doesNotMatch(ui, /03 · Flight & deployment[\s\S]{0,250}field\('Wind strength'/);
+});
