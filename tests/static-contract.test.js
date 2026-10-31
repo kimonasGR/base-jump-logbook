@@ -483,3 +483,19 @@ test('AI logbook import uses bounded ExcelJS parsing and extracts searchable PDF
   assert.match(ui, /fileBase64/);
   assert.ok(ui.includes('8*1024*1024'));
 });
+
+test('jump form validates unique positive numbering, numeric values, date, time and GPS coordinates', () => {
+  assert.match(ui, /Number\.isInteger\(jumpNumber\).*jump number must be a positive whole number/i);
+  assert.match(ui, /db\.jumps\.some\(x=>x\.id!==j\.id&&Number\(x\.number\)===jumpNumber\)/);
+  assert.match(ui, /Height',d\.height/);
+  assert.match(ui, /Delay for SU',d\.delaySu/);
+  assert.match(ui, /validateCoordinates\(d\.latitude,d\.longitude\)/);
+  assert.match(ui, /valid time in 24-hour format/);
+});
+
+test('logbook supports duplicating a jump without copying media or FlySight attachments', () => {
+  assert.match(ui, /data-duplicate-jump=/);
+  assert.match(ui, /data-duplicate-jump.*number:Math\.max/);
+  assert.match(ui, /media:\[\],flysightTrack:null,trackName:''/);
+  assert.match(ui, /privateNotes:''/);
+});
