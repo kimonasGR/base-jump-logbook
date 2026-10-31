@@ -188,15 +188,22 @@ window.lookupCountry=async(latitude,longitude)=>{const result=await api('/api/ge
 window.uploadCloudMedia=async(jumpId,items)=>{
   if(!bearer)throw Error('Sign in to upload private attachments.');
   const uploaded=[];
-  for(const item of items){
-    const blob=await (await fetch(item.data)).blob();
-    const form=new FormData();form.append('jumpId',jumpId);form.append('file',blob,item.name||'attachment');
-    const response=await fetch('/api/media',{method:'POST',headers:{Authorization:'Bearer '+bearer},body:form});
-    const data=await response.json().catch(()=>({}));
-    if(!response.ok)throw Error(data.error||'Media upload failed ('+response.status+').');
-    uploaded.push({...data,localId:item.localId});
+  try{
+    for(const item of items){
+      const blob=await (await fetch(item.data)).blob();
+      const form=new FormData();form.append('jumpId',jumpId);form.append('file',blob,item.name||'attachment');
+      const response=await fetch('/api/media',{method:'POST',headers:{Authorization:'Bearer '+bearer},body:form});
+      const data=await response.json().catch(()=>({}));
+      if(!response.ok)throw Error(data.error||'Media upload failed ('+response.status+').');
+      uploaded.push({...data,localId:item.localId});
+    }
+    return uploaded;
+  }catch(error){
+    const cleanup=await Promise.allSettled(uploaded.map(item=>window.deleteCloudMedia(item.storageId)));
+    const failedCleanup=cleanup.filter(result=>result.status==='rejected').length;
+    if(failedCleanup)throw Error(error.message+' Also, '+failedCleanup+' uploaded file(s) could not be rolled back; keep this jump and retry cleanup later.');
+    throw error;
   }
-  return uploaded;
 };
 window.loadCloudMedia=async(items)=>{
   if(!bearer)throw Error('Sign in to load private attachments.');
