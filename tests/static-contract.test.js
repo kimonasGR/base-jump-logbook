@@ -149,6 +149,7 @@ test('snapshot writes use optimistic concurrency and reject stale device copies'
   const handler = server.slice(start, end);
   assert.match(handler, /expectedUpdatedAt/);
   assert.match(handler, /WHERE user_snapshots\.updated_at=\$3::timestamptz/);
+  assert.match(handler, /GREATEST\(date_trunc\('milliseconds',clock_timestamp\(\)\),user_snapshots\.updated_at \+ interval '1 millisecond'\)/);
   assert.match(handler, /res\.status\(409\)/);
   assert.match(handler, /SNAPSHOT_CONFLICT/);
 });
