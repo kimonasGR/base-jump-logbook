@@ -321,7 +321,9 @@ test('FlySight TRACK.CSV parser ignores empty numeric coordinates instead of con
 test('FlySight sensor summary displays units and min/average/max without retaining raw sensor time series', () => {
   assert.match(ui, /function sensorSummaryHtml\(data\)/);
   assert.match(ui, /Minimum \/ average \/ maximum/);
-  assert.match(ui, /sensor\.validValues\+' numeric values'/);
+  assert.match(ui, /sensor\.validValues\+' values'/);
+  assert.match(ui, /sensor\.sampleRateHz!=null/);
+  assert.match(ui, /sensor\.durationSeconds!=null/);
   assert.match(ui, /sensor\.missingValues\+' blank'/);
   const start=ui.indexOf('function sensorSummaryHtml(');
   const end=ui.indexOf('function trackSummaryHtml(',start);
