@@ -634,6 +634,8 @@ test('FlySight receive path re-acknowledges duplicates within its eight-packet w
   assert.match(nativeFlySightBLE, /private var recentlyAcknowledgedCounters: \[UInt8\] = \[\]/);
   assert.match(nativeFlySightBLE, /recentlyAcknowledgedCounters\.contains\(counter\)/);
   assert.match(nativeFlySightBLE, /recentlyAcknowledgedCounters\.count > 8/);
+  assert.match(nativeFlySightBLE, /expectedDownloadCounter = 0/);
+  assert.doesNotMatch(nativeFlySightBLE, /if \(expectedDownloadCounter == nil\)/);
   assert.match(nativeFlySightBLE, /expectedDownloadCounter = counter &\+ 1/);
   assert.match(nativeFlySightBLE, /guard counter == expectedDownloadCounter/);
 });
