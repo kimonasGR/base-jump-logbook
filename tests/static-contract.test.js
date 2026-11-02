@@ -77,11 +77,11 @@ test('objects are created through jump saves, never manually', () => {
   assert.match(ui, /Objects are added automatically when you save a jump/);
 });
 
-test('cloud conflict cancellation never uploads local data over the cloud copy', () => {
-  assert.match(ui, /backupTime=window\.createLocalRecoveryBackup\(\)/);
-  assert.match(ui, /if\(!confirm\('A cloud logbook already exists/);
-  assert.match(ui, /Your local records remain unchanged/);
-  assert.doesNotMatch(ui, /gate\.style\.display='none';cloudReady=true;await syncCloud\(\);return/);
+test('initial cloud restore preserves local data unless cloud replacement is explicitly confirmed', () => {
+  assert.match(ui, /backupTime=window\\.createLocalRecoveryBackup\\(\\)/);
+  assert.match(ui, /Choose OK to load the cloud copy and replace this device’s records\\. Choose Cancel to keep this device’s records and upload them to the cloud/);
+  assert.match(ui, /if\\(loadCloud\\)window\\.setCloudSnapshot\\(cloud\\.snapshot\\);else\\{/);
+  assert.match(ui, /expectedUpdatedAt:cloud\\.updatedAt\\|\\|null/);
 });
 
 test('cloud restore retains local-only media for matching jump IDs', () => {
