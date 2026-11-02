@@ -314,6 +314,22 @@ test('FlySight TRACK.CSV parser ignores empty numeric coordinates instead of con
   assert.equal(points[0].lon,7);
 });
 
+test('FlySight sensor summary displays units and min/average/max without retaining raw sensor time series', () => {
+  assert.match(ui, /function sensorSummaryHtml\(data\)/);
+  assert.match(ui, /Minimum \/ average \/ maximum/);
+  assert.match(ui, /sensor\.validValues\+' numeric values'/);
+  assert.match(ui, /sensor\.missingValues\+' blank'/);
+  const start=ui.indexOf('function sensorSummaryHtml(');
+  const end=ui.indexOf('function trackSummaryHtml(',start);
+  const renderSummary=new Function('esc',ui.slice(start,end)+';return sensorSummaryHtml;')(
+    value=>String(value).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+  );
+  const html=renderSummary({sensors:{IMU:{headers:['acc_x'],units:['m/s2'],samples:2,validValues:2,missingValues:0,invalidValues:0,measurements:{acc_x:{min:1,average:2,max:3}}}}});
+  assert.match(html, /acc_x · m\/s2/);
+  assert.match(html, /1\.00 \/ 2\.00 \/ 3\.00/);
+  assert.match(html, /2 samples/);
+});
+
 test('FlySight 2 SENSOR.CSV imports sensor schemas, units, variables and samples', () => {
   assert.match(ui, /function parseFlySightSensorCsv\(raw\)/);
   assert.match(ui, /a\[0\]==='\$COL'/);
