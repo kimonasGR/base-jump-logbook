@@ -1,0 +1,24 @@
+{
+  "id": "/",
+  "name": "BASE Jump Logbook",
+  "short_name": "BASE Logbook",
+  "description": "Private personal BASE jumping logbook.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#101116",
+  "theme_color": "#101116",
+  "categories": [
+    "sports",
+    "lifestyle"
+  ],
+  "icons": [
+    {
+      "src": "/icons/base-logbook.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
