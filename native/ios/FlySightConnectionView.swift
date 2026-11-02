@@ -4,6 +4,7 @@ import CryptoKit
 struct FlySightConnectionView: View {
     @StateObject private var bluetooth = FlySightBLEClient()
     @State private var files: [FlySightBLEClient.FlySightFile] = []
+    @State private var currentDirectory = "/"
     @State private var downloadedFiles: [URL] = []
     @State private var selectedForImport: Set<String> = []
     @State private var isListing = false
@@ -28,6 +29,8 @@ struct FlySightConnectionView: View {
                     if bluetooth.state == .scanning {
                         HStack { ProgressView(); Text("Searching for nearby FlySight devices…") }
                     }
+                    Text("Unplug the FlySight from USB, switch it on, then double-press its button. Connect while the green LED is pulsing (about 30 seconds).")
+                        .font(.footnote).foregroundStyle(.secondary)
                 }
 
                 if !bluetooth.discoveredDevices.isEmpty {
@@ -67,22 +70,40 @@ struct FlySightConnectionView: View {
                 }
 
                 Section("Device files · Idle mode only") {
-                    Button {
-                        isListing = true
-                        bluetooth.listDirectory(path: "/") { result in
-                            isListing = false
-                            if case .success(let entries) = result { files = entries }
+                    HStack {
+                        Text(currentDirectory).font(.caption.monospaced()).foregroundStyle(.secondary)
+                        Spacer()
+                        if currentDirectory != "/" {
+                            Button("Up one level") {
+                                let parent = URL(fileURLWithPath: currentDirectory).deletingLastPathComponent().path
+                                readDirectory(parent.isEmpty ? "/" : parent)
+                            }
+                            .disabled(isListing || downloadingName != nil)
                         }
+                    }
+                    Button {
+                        readDirectory(currentDirectory)
                     } label: {
                         if isListing { ProgressView("Reading directory…") }
-                        else { Label("Read FlySight files", systemImage: "folder") }
+                        else { Label("Read this directory", systemImage: "arrow.clockwise") }
                     }
                     .disabled(bluetooth.state != .connected || isListing || downloadingName != nil)
                     if files.isEmpty {
-                        Text("Switch FlySight to Idle mode (LED off), connect, then read the device directory.")
+                        Text("Connect while FlySight is in Idle mode (LED off), then read the directory. Open the date and session folders to find TRACK.CSV and SENSOR.CSV.")
                             .font(.footnote).foregroundStyle(.secondary)
                     }
-                    ForEach(files.filter { let name = $0.name.uppercased(); return name.hasSuffix(".CSV") || name.hasSuffix(".GPX") }) { file in
+                    ForEach(files.filter(\.isDirectory)) { folder in
+                        Button {
+                            readDirectory(folder.path)
+                        } label: {
+                            Label(folder.name, systemImage: "folder")
+                        }
+                        .disabled(isListing || downloadingName != nil || bluetooth.state != .connected)
+                    }
+                    ForEach(files.filter { file in
+                        let name = file.name.uppercased()
+                        return !file.isDirectory && (name.hasSuffix(".CSV") || name.hasSuffix(".GPX"))
+                    }) { file in
                         HStack {
                             VStack(alignment: .leading) {
                                 Text(file.name)
@@ -90,7 +111,7 @@ struct FlySightConnectionView: View {
                                     .font(.caption).foregroundStyle(.secondary)
                             }
                             Spacer()
-                            Button(downloadingName == file.name ? "Downloading…" : "Download") {
+                            Button(downloadingName == file.path ? "Downloading…" : "Download") {
                                 download(file)
                             }
                             .disabled(downloadingName != nil || bluetooth.state != .connected)
@@ -132,7 +153,7 @@ struct FlySightConnectionView: View {
 
                 if !downloadedFiles.isEmpty {
                     Section("Ready to import into your logbook") {
-                        Text("Select TRACK.CSV and SENSOR.CSV together. Share the selected files, then choose the BASE Logbook web app's import screen and select both files in one operation.")
+                        Text("Downloaded files keep their original date/session folders. Select TRACK.CSV and, when available, SENSOR.CSV from the same session before uploading.")
                             .font(.footnote).foregroundStyle(.secondary)
                         ForEach(downloadedFiles, id: \.absoluteString) { url in
                             Toggle(isOn: Binding(
@@ -142,21 +163,23 @@ struct FlySightConnectionView: View {
                                     else { selectedForImport.remove(url.absoluteString) }
                                 }
                             )) {
-                                Label(url.lastPathComponent, systemImage: "doc.text")
+                                Label(url.deletingLastPathComponent().lastPathComponent + " / " + url.lastPathComponent, systemImage: "doc.text")
                             }
                         }
                         ShareLink(items: downloadedFiles.filter { selectedForImport.contains($0.absoluteString) }) {
                             Label("Share selected files together", systemImage: "square.and.arrow.up")
                         }
                         .disabled(selectedForImport.isEmpty)
-                        Button("Select TRACK.CSV + SENSOR.CSV") {
+                        Button("Select TRACK.CSV + SENSOR.CSV from one session") {
+                            let sessionFolder = downloadedFiles.first(where: { selectedForImport.contains($0.absoluteString) })?.deletingLastPathComponent()
+                                ?? downloadedFiles.last?.deletingLastPathComponent()
+                            guard let sessionFolder else { return }
                             selectedForImport = Set(downloadedFiles.filter {
-                                let name = $0.lastPathComponent.uppercased()
-                                return name == "TRACK.CSV" || name == "SENSOR.CSV"
+                                $0.deletingLastPathComponent() == sessionFolder &&
+                                ["TRACK.CSV", "SENSOR.CSV"].contains($0.lastPathComponent.uppercased())
                             }.map(\.absoluteString))
                         }
-                        .disabled(!downloadedFiles.contains { $0.lastPathComponent.uppercased() == "TRACK.CSV" } ||
-                                  !downloadedFiles.contains { $0.lastPathComponent.uppercased() == "SENSOR.CSV" })
+                        .disabled(!downloadedFiles.contains { $0.lastPathComponent.uppercased() == "TRACK.CSV" })
                     }
                 }
 
@@ -189,6 +212,19 @@ struct FlySightConnectionView: View {
         }
         let selected = downloadedFiles.filter { selectedForImport.contains($0.absoluteString) }
         guard !selected.isEmpty else { uploadStatus = "Select at least one file."; return }
+        guard Set(selected.map { $0.deletingLastPathComponent().standardizedFileURL }).count == 1 else {
+            uploadStatus = "Select files from one FlySight session only."
+            return
+        }
+        let selectedNames = Set(selected.map { $0.lastPathComponent.uppercased() })
+        guard selectedNames.contains("TRACK.CSV") || selectedNames.contains("TRACK.GPX") else {
+            uploadStatus = "Select TRACK.CSV or TRACK.GPX from this session."
+            return
+        }
+        guard !selectedNames.contains("SENSOR.CSV") || selectedNames.contains("TRACK.CSV") else {
+            uploadStatus = "SENSOR.CSV must be selected together with TRACK.CSV."
+            return
+        }
         isUploading = true
         defer { isUploading = false }
         do {
@@ -268,15 +304,35 @@ struct FlySightConnectionView: View {
         }
     }
 
+    private func readDirectory(_ path: String) {
+        currentDirectory = path.isEmpty ? "/" : path
+        isListing = true
+        files = []
+        bluetooth.listDirectory(path: currentDirectory) { result in
+            isListing = false
+            switch result {
+            case .success(let entries):
+                files = entries
+            case .failure(let error):
+                transferSaveError = error.localizedDescription
+            }
+        }
+    }
+
     private func download(_ file: FlySightBLEClient.FlySightFile) {
-        downloadingName = file.name
-        bluetooth.downloadFile(path: file.name, expectedSize: file.size) { result in
+        downloadingName = file.path
+        bluetooth.downloadFile(path: file.path, expectedSize: file.size) { result in
             downloadingName = nil
             switch result {
             case .success(let data):
                 do {
-                    let folder = try FileManager.default.url(for: .documentDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
-                        .appendingPathComponent("FlySight Imports", isDirectory: true)
+                    let documents = try FileManager.default.url(for: .documentDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
+                    let root = documents.appendingPathComponent("FlySight Imports", isDirectory: true)
+                    let relativeFolders = file.path.split(separator: "/").dropLast().map(String.init)
+                    let safeFolders = relativeFolders.map { component in
+                        String(component.map { $0.isLetter || $0.isNumber || $0 == "-" || $0 == "_" || $0 == "." ? $0 : "_" })
+                    }.filter { !$0.isEmpty && $0 != "." && $0 != ".." }
+                    let folder = safeFolders.reduce(root) { $0.appendingPathComponent($1, isDirectory: true) }
                     try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true, attributes: nil)
                     let destination = folder.appendingPathComponent(file.name)
                     try data.write(to: destination, options: .atomic)
