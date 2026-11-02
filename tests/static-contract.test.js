@@ -524,3 +524,27 @@ test('weather conditions use structured sky, lighting, wind strength and compass
   assert.match(ui, /windDirection:\['N','NE','E','SE','S','SW','W','NW','Variable'\]/);
   assert.doesNotMatch(ui, /03 · Flight & deployment[\s\S]{0,250}field\('Wind strength'/);
 });
+
+
+test('PWA manifest declares a standalone mobile app with a valid icon', async () => {
+  const manifest = JSON.parse(await readFile(new URL('../public/manifest.webmanifest', import.meta.url), 'utf8'));
+  assert.equal(manifest.name, 'BASE Jump Logbook');
+  assert.equal(manifest.display, 'standalone');
+  assert.equal(manifest.start_url, '/');
+  assert.ok(manifest.icons.some(icon => icon.src === '/icons/base-logbook.svg'));
+});
+
+test('service worker caches only the app shell and never intercepts API requests', async () => {
+  const sw = await readFile(new URL('../public/sw.js', import.meta.url), 'utf8');
+  assert.match(sw, /base-logbook-shell-v1/);
+  assert.match(sw, /url\.pathname\.startsWith\('\/api\/'\)/);
+  assert.match(sw, /request\.mode === 'navigate'/);
+  assert.match(sw, /caches\.match\('\/'\)/);
+});
+
+test('mobile app metadata and secure service worker registration are present', () => {
+  assert.match(ui, /apple-mobile-web-app-capable/);
+  assert.match(ui, /rel="manifest" href="\/manifest\.webmanifest"/);
+  assert.match(ui, /navigator\.serviceWorker\.register\('\/sw\.js'/);
+  assert.match(ui, /location\.protocol === 'https:'/);
+});
