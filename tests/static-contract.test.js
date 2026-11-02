@@ -629,3 +629,13 @@ test('FlySight directory completion always stops timeout and keep-alive tasks', 
   assert.match(completion, /stopTransferTimers\(\)/);
   assert.match(completion, /directoryCompletion = nil/);
 });
+
+
+test('offline PWA falls back to the local logbook when the Auth CDN or API is unavailable', () => {
+  assert.match(ui, /let neonAuth=null/);
+  assert.match(ui, /await import\('https:\/\/esm\.sh\/@neondatabase\/auth'\)/);
+  assert.match(ui, /function enterOfflineMode\(\)/);
+  assert.match(ui, /if\(!auth\)\{enterOfflineMode\(\);return\}/);
+  assert.match(ui, /Offline mode · records stay on this device/);
+  assert.match(ui, /navigator\.onLine===false\|\|!error\.status\|\|error\.status>=500/);
+});
