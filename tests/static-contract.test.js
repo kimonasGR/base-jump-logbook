@@ -653,6 +653,29 @@ test('FlySight iTOW timestamps unwrap GPS-week rollover for continuous track tim
   assert.match(ui, /point\.time=String\(raw\+weekOffset\)/);
 });
 
+test('FlySight track summary reports GPS fix, satellite, accuracy and timing-gap quality metrics', () => {
+  const timeSource=ui.match(/function trackTimeMs\(value\)\{[^\n]*\}/)?.[0];
+  const start=ui.indexOf('function summarizeTrack(');
+  const end=ui.indexOf('function trackQualityHtml(',start);
+  const summarizeSource=ui.slice(start,end);
+  const summarize=new Function(timeSource+';'+summarizeSource+';return summarizeTrack;')();
+  const result=summarize([
+    {lat:0,lon:0,time:'2026-01-01T00:00:00Z',gpsfix:3,numsv:12,hacc:1.5,vacc:2},
+    {lat:0,lon:0.001,time:'2026-01-01T00:00:01Z',gpsfix:3,numsv:10,hacc:2.5,vacc:3},
+    {lat:0,lon:0.002,time:'2026-01-01T00:00:04Z',gpsfix:2,numsv:6,hacc:5,vacc:6}
+  ]);
+  assert.equal(result.gpsFixSamples,3);
+  assert.equal(result.gpsFix3dPoints,2);
+  assert.equal(result.averageSatellites,28/3);
+  assert.equal(result.minimumSatellites,6);
+  assert.equal(result.averageHorizontalAccuracyMeters,3);
+  assert.equal(result.maxHorizontalAccuracyMeters,5);
+  assert.equal(result.maxVerticalAccuracyMeters,6);
+  assert.equal(result.gapsOverTwoSeconds,1);
+  assert.match(ui, /function trackQualityHtml\(t\)/);
+  assert.match(ui, /GPS data quality/);
+});
+
 test('FlySight maximum speed uses each segment distance, not cumulative distance', () => {
   const timeSource = ui.match(/function trackTimeMs\(value\)\{[^\n]*\}/)?.[0];
   const summarySource = ui.match(/function summarizeTrack\(points\)\{[^\n]*\}/)?.[0];
