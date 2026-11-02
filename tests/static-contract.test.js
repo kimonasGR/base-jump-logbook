@@ -608,7 +608,7 @@ test('FlySight maximum speed uses each segment distance, not cumulative distance
 
 
 test('wind speed is recorded with an explicit unit and validates non-negative numeric values', () => {
-  assert.match(ui, /field\('Wind speed \\('\+\(j\.windUnit\|\|db\.settings\.windUnit\)\+'\\)','windSpeed',j\.windSpeed\?\?''/);
+  assert.match(ui, /field\('Wind speed \('\+\(j\.windUnit\|\|db\.settings\.windUnit\)\+'\)','windSpeed',j\.windSpeed\?\?''/);
   assert.match(ui, /id="windUnit" name="windUnit"/);
   assert.match(ui, /\['Wind speed',d\.windSpeed\]/);
   assert.match(ui, /windUnit:\'m\/s\'/);
