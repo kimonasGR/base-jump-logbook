@@ -31,10 +31,10 @@ The protocol documentation specifies Go-Back-N with a window of eight packets an
 
 ## Planned import workflow
 
-1. User explicitly connects and pairs the FlySight 2.
+1. User unplugs USB, switches on the FlySight 2, double-presses its button to open the pairing window, then connects from the iOS app.
 2. User switches the FlySight to Idle mode (LED off).
-3. App lists the device directory and user selects `TRACK.CSV` and `SENSOR.CSV`.
-4. App downloads the files without modifying or deleting the originals.
+3. App lists the device directory. The user browses the date and session folders, then selects `TRACK.CSV` and optionally `SENSOR.CSV` from the same session.
+4. App downloads the files into matching local date/session folders without modifying or deleting the originals.
 5. In the signed-in web logbook, create a one-time FlySight token from Settings. In the iOS app, paste the token (the production API URL is pre-filled) and upload the selected files over HTTPS in 256 KiB chunks. The server verifies the declared SHA-256 before making files visible to the same account.
 6. In the web logbook, open a new jump and use **Load FlySight inbox**. The browser downloads and independently verifies every chunk, passes the source files into the existing TRACK/SENSOR import parser, and shows the track and sensor summary for review. The user saves the jump only after checking the draft.
 7. Delete the temporary inbox handoff from the jump form after import; the saved jump retains its imported track data and source-file fingerprints.
@@ -42,9 +42,8 @@ The protocol documentation specifies Go-Back-N with a window of eight packets an
 ## Known gaps before release
 
 - Configure Apple signing/team and install the generated app on a physical iPhone.
-- Validate secure pairing, device discovery and mode values on actual iPhone/FlySight hardware.
-- Confirm directory path conventions and packet offsets using real device responses.
-- Implement robust Go-Back-N retransmission/window handling and MTU negotiation; test interrupted and large downloads.
+- Validate secure pairing, device discovery, directory attribute flags, mode values and packet offsets on actual iPhone/FlySight hardware.
+- Validate Go-Back-N retransmission/window handling, counter wrap, MTU negotiation and interrupted/large downloads on hardware. The current implementation is bounded and duplicate-aware, but is not yet a proven full Go-Back-N implementation.
 - Validate the complete upload → inbox → browser verification → import-review workflow using a signed-in account.
 - Add automated iOS build/device tests.
 
