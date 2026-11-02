@@ -585,6 +585,12 @@ test('FlySight iTOW millisecond values are normalized before timing calculations
   assert.equal((trackTimeMs('345001') - trackTimeMs('345000')) / 1000, 1);
 });
 
+test('FlySight iTOW timestamps unwrap GPS-week rollover for continuous track timing', () => {
+  assert.match(ui, /if\(timeKey==='itow'\)\{\s*let weekOffset=0,lastRaw=null/);
+  assert.match(ui, /lastRaw-raw>302400\)weekOffset\+=604800/);
+  assert.match(ui, /point\.time=String\(raw\+weekOffset\)/);
+});
+
 test('FlySight maximum speed uses each segment distance, not cumulative distance', () => {
   const timeSource = ui.match(/function trackTimeMs\(value\)\{[^\n]*\}/)?.[0];
   const summarySource = ui.match(/function summarizeTrack\(points\)\{[^\n]*\}/)?.[0];
