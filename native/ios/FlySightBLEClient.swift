@@ -89,6 +89,7 @@ final class FlySightBLEClient: NSObject, ObservableObject {
     private var keepAliveTask: Task<Void, Never>?
     private var expectedDownloadCounter: UInt8?
     private var lastAcknowledgedCounter: UInt8?
+    private var recentlyAcknowledgedCounters: [UInt8] = []
     private let maximumImportFileSize = 15 * 1024 * 1024
 
     override init() {
@@ -143,6 +144,7 @@ final class FlySightBLEClient: NSObject, ObservableObject {
         downloadBuffer = Data()
         expectedDownloadCounter = nil
         lastAcknowledgedCounter = nil
+        recentlyAcknowledgedCounters = []
         downloadExpectedSize = expectedSize
         downloadCompletion = completion
         downloadPath = path
@@ -224,8 +226,7 @@ final class FlySightBLEClient: NSObject, ObservableObject {
     }
 
     private func finishDirectory(_ result: Result<[FlySightFile], Error>) {
-        transferTimeout?.cancel()
-        transferTimeout = nil
+        stopTransferTimers()
         let completion = directoryCompletion
         directoryCompletion = nil
         if case .success(let files) = result { transferStatus = "Found \(files.count) files" }
@@ -261,21 +262,27 @@ final class FlySightBLEClient: NSObject, ObservableObject {
             guard data.count >= 2, downloadCompletion != nil else { return }
             let counter = data[1]
             if expectedDownloadCounter == nil { expectedDownloadCounter = counter }
-            if counter == lastAcknowledgedCounter {
-                // Re-acknowledge duplicates without appending their bytes twice.
+            if recentlyAcknowledgedCounters.contains(counter) {
+                // Re-acknowledge any duplicate still inside the receive window.
+                // Never append duplicate payload bytes to the downloaded file.
                 if let tx = characteristics[filePacketIn] {
                     peripheral?.writeValue(Data([0x12, counter]), for: tx, type: .withoutResponse)
                 }
                 return
             }
             guard counter == expectedDownloadCounter else {
-                // Leave out-of-order packets unacknowledged; the sender retries from its window base.
+                // Future/out-of-window packets remain unacknowledged so the
+                // FlySight sender can retry from its current Go-Back-N base.
                 return
             }
             if let tx = characteristics[filePacketIn] {
                 peripheral?.writeValue(Data([0x12, counter]), for: tx, type: .withoutResponse)
             }
             lastAcknowledgedCounter = counter
+            recentlyAcknowledgedCounters.append(counter)
+            if recentlyAcknowledgedCounters.count > 8 {
+                recentlyAcknowledgedCounters.removeFirst(recentlyAcknowledgedCounters.count - 8)
+            }
             expectedDownloadCounter = counter &+ 1
             if data.count == 2 {
                 let result = downloadBuffer
