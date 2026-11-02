@@ -209,7 +209,7 @@ test('local data is backed up before a cloud restore can replace it', () => {
   assert.match(ui, /window\.createLocalRecoveryBackup=\(\)=>/);
   assert.match(ui, /baseLogbookRecoveryBackups\.v1/);
   assert.match(ui, /backupTime=window\.createLocalRecoveryBackup\(\)/);
-  assert.match(ui, /if\(!confirm\('A cloud logbook already exists/);
+  assert.match(ui, /Choose OK to load the cloud copy and replace this device’s records/);
   assert.match(ui, /id="exportRecovery"/);
 });
 
