@@ -168,9 +168,16 @@ function validateXlsxZip(bytes) {
     if(offset+46>eocd||bytes.readUInt32LE(offset)!==0x02014b50) throw new Error('Invalid XLSX archive entry');
     const flags=bytes.readUInt16LE(offset+8), compressed=bytes.readUInt32LE(offset+20), expanded=bytes.readUInt32LE(offset+24);
     const nameLength=bytes.readUInt16LE(offset+28), extraLength=bytes.readUInt16LE(offset+30), commentLength=bytes.readUInt16LE(offset+32);
-    if(flags&1||compressed===0xffffffff||expanded===0xffffffff) throw new Error('Encrypted and ZIP64 XLSX entries are not supported');
+    const localOffset=bytes.readUInt32LE(offset+42);
+    if(flags&1||compressed===0xffffffff||expanded===0xffffffff||localOffset===0xffffffff) throw new Error('Encrypted and ZIP64 XLSX entries are not supported');
     const next=offset+46+nameLength+extraLength+commentLength;
     if(next>eocd||next>directoryOffset+directorySize) throw new Error('Invalid XLSX archive entry bounds');
+    if(localOffset+30>directoryOffset||bytes.readUInt32LE(localOffset)!==0x04034b50) throw new Error('Invalid XLSX local file header');
+    const localNameLength=bytes.readUInt16LE(localOffset+26), localExtraLength=bytes.readUInt16LE(localOffset+28);
+    const localNameStart=localOffset+30, centralNameStart=offset+46;
+    if(localNameLength!==nameLength||!bytes.subarray(localNameStart,localNameStart+localNameLength).equals(bytes.subarray(centralNameStart,centralNameStart+nameLength))) throw new Error('XLSX local and central entry names do not match');
+    const dataStart=localNameStart+localNameLength+localExtraLength;
+    if(dataStart+compressed>directoryOffset) throw new Error('XLSX entry data overlaps the archive directory');
     if(expanded>16*1024*1024||(expanded>0&&(compressed===0||expanded/compressed>200))) throw new Error('XLSX archive compression ratio or entry size exceeds limits');
     totalExpanded+=expanded;
     if(totalExpanded>32*1024*1024) throw new Error('XLSX expanded size exceeds 32 MB');
