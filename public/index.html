@@ -65,7 +65,7 @@ function parseFlySightCsv(raw){
   const find=(names)=>{const key=headers.find(h=>names.includes(h));return key?key:null};
   const latKey=find(['lat','latitude','gps latitude']),lonKey=find(['lon','longitude','gps longitude']),altKey=find(['hmsl','alt','altitude','height','height above mean sea level']),timeKey=find(['itow','time','timestamp','utc']);
   if(!latKey||!lonKey)throw Error('CSV is missing latitude or longitude columns.');
-  const number=v=>{const n=Number(v);return Number.isFinite(n)?n:null};
+  const number=v=>{if(v==null||String(v).trim()==='')return null;const n=Number(v);return Number.isFinite(n)?n:null};
   const points=rows.map(row=>{
     const lat=number(row[latKey]),lon=number(row[lonKey]),alt=altKey?number(row[altKey]):null;
     const time=timeKey?(timeKey==='itow'&&number(row[timeKey])!==null?String(number(row[timeKey])/1000):row[timeKey]):null;
@@ -89,7 +89,38 @@ function parseFlySightCsv(raw){
   if(!points.length)throw Error('No valid GNSS track points found in CSV.');
   return points;
 }
-function parseFlySightSensorCsv(raw){const lines=raw.replace(/^\\uFEFF/,'').split(/\\r?\\n/).filter(x=>x.trim());if(!lines[0]?.trim().startsWith('$FLYS'))throw Error('SENSOR.CSV must use the FlySight 2 format.');const dataStart=lines.findIndex(x=>x.trim()==='$DATA');if(dataStart<0)throw Error('SENSOR.CSV is missing its $DATA header.');const columns={},units={},variables={};for(const line of lines.slice(1,dataStart)){const a=splitCsvLine(line);if(a[0]==='$VAR'&&a.length>=3)variables[a[1]]=a.slice(2).join(',');if(a[0]==='$COL'&&a[1])columns[a[1].toUpperCase()]=a.slice(2).map(x=>x.toLowerCase());if(a[0]==='$UNIT'&&a[1])units[a[1].toUpperCase()]=a.slice(2)}const sensors={};for(const [name,headers] of Object.entries(columns))sensors[name]={headers,units:units[name]||[],samples:0,measurements:{}};for(const line of lines.slice(dataStart+1)){const a=splitCsvLine(line),name=(a[0]||'').replace(/^\\$/,'').toUpperCase(),sensor=sensors[name];if(!sensor||a.length!==sensor.headers.length+1)continue;sensor.samples++;sensor.headers.forEach((h,i)=>{const n=Number(a[i+1]);if(!Number.isFinite(n))return;const m=sensor.measurements[h]||(sensor.measurements[h]={min:n,max:n,sum:0,count:0});m.min=Math.min(m.min,n);m.max=Math.max(m.max,n);m.sum+=n;m.count++})}const totalSamples=Object.values(sensors).reduce((n,s)=>n+s.samples,0);if(!totalSamples)throw Error('No sensor samples found in SENSOR.CSV.');for(const sensor of Object.values(sensors))for(const m of Object.values(sensor.measurements))m.average=m.count?m.sum/m.count:null;return {variables,sensors,totalSamples}}
+function parseFlySightSensorCsv(raw){
+  const lines=String(raw??'').replace(/^\uFEFF/,'').split(/\r?\n/).filter(x=>x.trim());
+  if(!lines[0]?.trim().startsWith('$FLYS'))throw Error('SENSOR.CSV must use the FlySight 2 format.');
+  const dataStart=lines.findIndex(x=>x.trim()==='$DATA');
+  if(dataStart<0)throw Error('SENSOR.CSV is missing its $DATA header.');
+  const columns={},units={},variables={};
+  for(const line of lines.slice(1,dataStart)){
+    const a=splitCsvLine(line);
+    if(a[0]==='$VAR'&&a.length>=3)variables[a[1]]=a.slice(2).join(',');
+    if(a[0]==='$COL'&&a[1])columns[a[1].toUpperCase()]=a.slice(2).map(x=>x.toLowerCase());
+    if(a[0]==='$UNIT'&&a[1])units[a[1].toUpperCase()]=a.slice(2);
+  }
+  const sensors={};
+  for(const [name,headers] of Object.entries(columns))sensors[name]={headers,units:units[name]||[],samples:0,validValues:0,missingValues:0,invalidValues:0,measurements:{}};
+  for(const line of lines.slice(dataStart+1)){
+    const a=splitCsvLine(line),name=(a[0]||'').trim().replace(/^\$/,'').toUpperCase(),sensor=sensors[name];
+    if(!sensor||a.length!==sensor.headers.length+1)continue;
+    sensor.samples++;
+    sensor.headers.forEach((h,i)=>{
+      const rawValue=String(a[i+1]??'').trim();
+      if(!rawValue){sensor.missingValues++;return;}
+      const n=Number(rawValue);
+      if(!Number.isFinite(n)){sensor.invalidValues++;return;}
+      const m=sensor.measurements[h]||(sensor.measurements[h]={min:n,max:n,sum:0,count:0});
+      m.min=Math.min(m.min,n);m.max=Math.max(m.max,n);m.sum+=n;m.count++;sensor.validValues++;
+    });
+  }
+  const totalSamples=Object.values(sensors).reduce((n,s)=>n+s.samples,0);
+  if(!totalSamples)throw Error('No sensor samples found in SENSOR.CSV.');
+  for(const sensor of Object.values(sensors))for(const m of Object.values(sensor.measurements))m.average=m.count?m.sum/m.count:null;
+  return {variables,sensors,totalSamples};
+}
 function parseFlySightGpx(raw){const doc=new DOMParser().parseFromString(raw,'application/xml');if(doc.querySelector('parsererror'))throw Error('Invalid GPX XML file.');const points=[...doc.querySelectorAll('trkpt,rtept,wpt')].map(el=>{const lat=Number(el.getAttribute('lat')),lon=Number(el.getAttribute('lon')),ele=Number(el.querySelector('ele')?.textContent),time=el.querySelector('time')?.textContent;return {lat,lon,...(Number.isFinite(ele)?{alt:ele}:{}),...(time?{time}:{})}}).filter(p=>Number.isFinite(p.lat)&&Number.isFinite(p.lon)&&Math.abs(p.lat)<=90&&Math.abs(p.lon)<=180).slice(0,10000);if(!points.length)throw Error('No GPS track points found in GPX.');return points}
 function summarizeTrack(points){const rad=x=>x*Math.PI/180;let distance=0,maxSpeed=0;for(let i=1;i<points.length;i++){const a=points[i-1],b=points[i],dLat=rad(b.lat-a.lat),dLon=rad(b.lon-a.lon),h=Math.sin(dLat/2)**2+Math.cos(rad(a.lat))*Math.cos(rad(b.lat))*Math.sin(dLon/2)**2,segmentDistance=6371000*2*Math.atan2(Math.sqrt(h),Math.sqrt(1-h));distance+=segmentDistance;const dt=(trackTimeMs(b.time)-trackTimeMs(a.time))/1000;if(dt>0)maxSpeed=Math.max(maxSpeed,segmentDistance/dt,Number.isFinite(Number(b.speed))?Number(b.speed):0)}const alts=points.map(p=>p.alt).filter(Number.isFinite),times=points.map(p=>trackTimeMs(p.time)).filter(Number.isFinite);return {points:points.length,distanceMeters:Math.round(distance),...(alts.length?{altitudeMin:Math.min(...alts),altitudeMax:Math.max(...alts)}:{}),...(times.length>1?{durationSeconds:Math.max(0,(Math.max(...times)-Math.min(...times))/1000)}:{}),...(maxSpeed?{maxSpeedMps:maxSpeed}:{})}}
 
