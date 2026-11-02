@@ -548,3 +548,12 @@ test('mobile app metadata and secure service worker registration are present', (
   assert.match(ui, /navigator\.serviceWorker\.register\('\/sw\.js'/);
   assert.match(ui, /location\.protocol === 'https:'/);
 });
+
+
+test('jump logbook exposes a working suit filter alongside country and object type', () => {
+  assert.match(ui, /id="suitFilter"/);
+  assert.match(ui, /filterSuit===c\?'selected':''/);
+  assert.match(ui, /suit\.onchange=\(\)=>\{filterSuit=suit\.value;render\(\)\}/);
+  assert.match(ui, /&&\(!filterSuit\|\|j\.suit===filterSuit\)/);
+  assert.match(ui, /query=filterCountry=filterType=filterSuit=''/);
+});
