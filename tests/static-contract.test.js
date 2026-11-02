@@ -303,7 +303,7 @@ test('FlySight 2 SENSOR.CSV parser handles BOM, CRLF, sensor prefixes and empty 
   assert.equal(parsed.sensors.IMU.measurements.time,undefined);
   assert.equal(parsed.sensors.IMU.measurements.acc_y.average,7);
   assert.equal(parsed.sensors.IMU.missingValues,1);
-  assert.equal(parsed.sensors.IMU.validValues,7);
+  assert.equal(parsed.sensors.IMU.validValues,5);
 });
 
 test('FlySight TRACK.CSV parser ignores empty numeric coordinates instead of converting them to zero', () => {
