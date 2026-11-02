@@ -84,7 +84,7 @@ function summarizeTrack(points){const rad=x=>x*Math.PI/180;let distance=0,maxSpe
 function renderAnalytics(){
  const jumps=[...db.jumps],total=jumps.length;
  const countBy=key=>{const map=new Map();for(const j of jumps){const value=String(key(j)||'').trim()||'Not recorded';map.set(value,(map.get(value)||0)+1)}return [...map].sort((a,b)=>b[1]-a[1]||a[0].localeCompare(b[0]))};
- const years=countBy(j=>/^\\d{4}/.test(j.date||'')?(j.date||'').slice(0,4):'Date unknown');
+ const years=countBy(j=>/^\d{4}/.test(j.date||'')?(j.date||'').slice(0,4):'Date unknown');
  const objects=countBy(j=>j.objectName);
  const types=countBy(j=>j.jumpType);
  const suits=countBy(j=>j.suit);
