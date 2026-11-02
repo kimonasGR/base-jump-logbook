@@ -341,15 +341,20 @@ test('FlySight 2 metadata identifies matching track and sensor sessions and devi
   const track='$FLYS,1\n$VAR,FIRMWARE_VER,v2024.05.25.pairing_request\n$VAR,DEVICE_ID,003e0038484e501420353131\n$VAR,SESSION_ID,3e10c2f6b1ea4604758b8926\n$COL,GNSS,time,lat,lon,hMSL,velN,velE,velD,hAcc,vAcc,sAcc,numSV\n$UNIT,GNSS,,deg,deg,m,m/s,m/s,m/s,m,m,m/s,\n$DATA\n$GNSS,2024-04-20T04:20:00.000Z,33.6568828,-117.7466357,630.077,-31.92,48.42,-34.93,136.117,170.718,4.74,4';
   const sensor='$FLYS,1\n$VAR,FIRMWARE_VER,v2024.05.25.pairing_request\n$VAR,DEVICE_ID,003e0038484e501420353131\n$VAR,SESSION_ID,3e10c2f6b1ea4604758b8926\n$COL,BARO,time,pressure,temperature\n$UNIT,BARO,s,Pa,deg C\n$COL,IMU,time,wx,wy,wz,ax,ay,az,temperature\n$UNIT,IMU,s,deg/s,deg/s,deg/s,g,g,g,deg C\n$DATA\n$IMU,59970.376,-0.427,1.770,1.953,-0.01464,-0.00732,0.94287,25.64\n$BARO,59970.376,101325,25.64';
   const tm=parseMetadata.parseFlySightMetadata(track),sm=parseMetadata.parseFlySightSensorCsv(sensor);
+  const validatePair=new Function(source+';return validateFlySightPair;')();
+
   assert.equal(tm.sessionId,sm.metadata.sessionId);
+  assert.equal(validatePair(tm,sm),true);
   assert.equal(tm.deviceId,sm.metadata.deviceId);
   assert.equal(tm.firmwareVersion,'v2024.05.25.pairing_request');
   assert.equal(sm.sensors.IMU.samples,1);
   assert.equal(sm.sensors.BARO.samples,1);
   const mismatch=sensor.replace('3e10c2f6b1ea4604758b8926','different-session');
   assert.notEqual(tm.sessionId,parseMetadata.parseFlySightSensorCsv(mismatch).metadata.sessionId);
+  assert.throws(()=>validatePair(tm,parseMetadata.parseFlySightSensorCsv(mismatch)),/SESSION_ID mismatch/);
   const otherDevice=sensor.replace('003e0038484e501420353131','other-device');
   assert.notEqual(tm.deviceId,parseMetadata.parseFlySightSensorCsv(otherDevice).metadata.deviceId);
+  assert.throws(()=>validatePair(tm,parseMetadata.parseFlySightSensorCsv(otherDevice)),/DEVICE_ID mismatch/);
 });
 
 test('FlySight 2 SENSOR.CSV imports sensor schemas, units, variables and samples', () => {
