@@ -289,7 +289,8 @@ test('FlySight 2 SENSOR.CSV parser handles BOM, CRLF, sensor prefixes and empty 
   const sensorStart=ui.indexOf('function parseFlySightSensorCsv(');
   const gpxStart=ui.indexOf('function parseFlySightGpx(');
   const splitSource=ui.slice(splitStart,trackStart);
-  const sensorSource=ui.slice(sensorStart,gpxStart);
+  const metaStart=ui.indexOf('function parseFlySightMetadata(');
+  const sensorSource=ui.slice(metaStart,sensorStart)+ui.slice(sensorStart,gpxStart);
   const parseSensor=new Function(splitSource+sensorSource+';return parseFlySightSensorCsv;')();
   const raw='\uFEFF$FLYS,2\r\n$VAR,IMU,Inertial measurement unit\r\n$COL,IMU,TIME,ACC_X,ACC_Y,ACC_Z\r\n$UNIT,IMU,ms,m/s2,m/s2,m/s2\r\n$DATA\r\n$IMU,100,1,,3\r\n$IMU,200,5,7,9\r\n';
   const parsed=parseSensor(raw);
@@ -337,8 +338,8 @@ test('FlySight 2 metadata identifies matching track and sensor sessions and devi
   const gpxStart=ui.indexOf('function parseFlySightGpx(');
   const source=ui.slice(splitStart,metaStart)+ui.slice(metaStart,sensorStart)+ui.slice(sensorStart,gpxStart);
   const parseMetadata=new Function(source+';return {parseFlySightMetadata,parseFlySightSensorCsv};')();
-  const track='$FLYS,1\\n$VAR,FIRMWARE_VER,v2024.05.25.pairing_request\\n$VAR,DEVICE_ID,003e0038484e501420353131\\n$VAR,SESSION_ID,3e10c2f6b1ea4604758b8926\\n$COL,GNSS,time,lat,lon,hMSL,velN,velE,velD,hAcc,vAcc,sAcc,numSV\\n$UNIT,GNSS,,deg,deg,m,m/s,m/s,m/s,m,m,m/s,\\n$DATA\\n$GNSS,2024-04-20T04:20:00.000Z,33.6568828,-117.7466357,630.077,-31.92,48.42,-34.93,136.117,170.718,4.74,4';
-  const sensor='$FLYS,1\\n$VAR,FIRMWARE_VER,v2024.05.25.pairing_request\\n$VAR,DEVICE_ID,003e0038484e501420353131\\n$VAR,SESSION_ID,3e10c2f6b1ea4604758b8926\\n$COL,BARO,time,pressure,temperature\\n$UNIT,BARO,s,Pa,deg C\\n$COL,IMU,time,wx,wy,wz,ax,ay,az,temperature\\n$UNIT,IMU,s,deg/s,deg/s,deg/s,g,g,g,deg C\\n$DATA\\n$IMU,59970.376,-0.427,1.770,1.953,-0.01464,-0.00732,0.94287,25.64\\n$BARO,59970.376,101325,25.64';
+  const track='$FLYS,1\n$VAR,FIRMWARE_VER,v2024.05.25.pairing_request\n$VAR,DEVICE_ID,003e0038484e501420353131\n$VAR,SESSION_ID,3e10c2f6b1ea4604758b8926\n$COL,GNSS,time,lat,lon,hMSL,velN,velE,velD,hAcc,vAcc,sAcc,numSV\n$UNIT,GNSS,,deg,deg,m,m/s,m/s,m/s,m,m,m/s,\n$DATA\n$GNSS,2024-04-20T04:20:00.000Z,33.6568828,-117.7466357,630.077,-31.92,48.42,-34.93,136.117,170.718,4.74,4';
+  const sensor='$FLYS,1\n$VAR,FIRMWARE_VER,v2024.05.25.pairing_request\n$VAR,DEVICE_ID,003e0038484e501420353131\n$VAR,SESSION_ID,3e10c2f6b1ea4604758b8926\n$COL,BARO,time,pressure,temperature\n$UNIT,BARO,s,Pa,deg C\n$COL,IMU,time,wx,wy,wz,ax,ay,az,temperature\n$UNIT,IMU,s,deg/s,deg/s,deg/s,g,g,g,deg C\n$DATA\n$IMU,59970.376,-0.427,1.770,1.953,-0.01464,-0.00732,0.94287,25.64\n$BARO,59970.376,101325,25.64';
   const tm=parseMetadata.parseFlySightMetadata(track),sm=parseMetadata.parseFlySightSensorCsv(sensor);
   assert.equal(tm.sessionId,sm.metadata.sessionId);
   assert.equal(tm.deviceId,sm.metadata.deviceId);
