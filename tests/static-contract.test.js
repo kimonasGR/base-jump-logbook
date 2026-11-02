@@ -331,6 +331,19 @@ test('FlySight import accepts TRACK and SENSOR files together', () => {
 });
 
 
+test('native FlySight browser navigates date/session folders and downloads full file paths', () => {
+  assert.match(nativeFlySightBLE, /var isDirectory: Bool \{ attributes & 0x10 != 0 \}/);
+  assert.match(nativeFlySightBLE, /listingPath/);
+  assert.match(nativeFlySightBLE, /let fullPath = parent\.isEmpty \? "\/" \+ name : "\/" \+ parent \+ "\/" \+ name/);
+  assert.match(nativeFlySightBLE, /var id: String \{ path \}/);
+  assert.match(nativeFlySightView, /currentDirectory = "\/"/);
+  assert.match(nativeFlySightView, /files\.filter\(\\\.isDirectory\)/);
+  assert.match(nativeFlySightView, /readDirectory\(folder\.path\)/);
+  assert.match(nativeFlySightView, /downloadFile\(path: file\.path/);
+  assert.match(nativeFlySightView, /Select files from one FlySight session only/);
+  assert.match(nativeFlySightView, /FlySight Imports/);
+});
+
 test('native FlySight upload retries transient HTTP and transport failures', () => {
   assert.match(nativeFlySight, /private func sendUploadRequest\(_ request: URLRequest\) async throws/);
   assert.match(nativeFlySight, /for attempt in 0\.\.\<3/);
