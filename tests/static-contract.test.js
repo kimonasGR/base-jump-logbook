@@ -176,6 +176,13 @@ test('frontend pauses cloud sync on conflict, resets stale conflict state and ex
   assert.match(ui, /const backupTime=window\.createLocalRecoveryBackup\(\)/);
 });
 
+test('inline application script parses as valid JavaScript', () => {
+  const start=ui.lastIndexOf('<script>');
+  const end=ui.indexOf('</script>',start);
+  assert.ok(start>=0&&end>start,'Expected inline application script');
+  assert.doesNotThrow(()=>new Function(ui.slice(start+8,end)));
+});
+
 test('HTML contains one application shell and one Neon Auth bootstrap', () => {
   assert.equal((ui.match(/id="authGate"/g) || []).length, 1);
   assert.equal((ui.match(/const AUTH_URL=/g) || []).length, 1);
