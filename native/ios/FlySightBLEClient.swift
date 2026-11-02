@@ -91,8 +91,7 @@ final class FlySightBLEClient: NSObject, ObservableObject {
     private var downloadPath: String?
     private var transferTimeout: Task<Void, Never>?
     private var keepAliveTask: Task<Void, Never>?
-    private var expectedDownloadCounter: UInt8?
-    private var lastAcknowledgedCounter: UInt8?
+    private var expectedDownloadCounter: UInt8 = 0
     private var recentlyAcknowledgedCounters: [UInt8] = []
     private let maximumImportFileSize = 15 * 1024 * 1024
 
@@ -147,8 +146,7 @@ final class FlySightBLEClient: NSObject, ObservableObject {
         guard expectedSize <= UInt32(maximumImportFileSize) else { completion(.failure(FileTransferError.fileTooLarge)); return }
         guard let tx = characteristics[filePacketIn], characteristics[filePacketOut] != nil else { completion(.failure(FileTransferError.missingCharacteristic)); return }
         downloadBuffer = Data()
-        expectedDownloadCounter = nil
-        lastAcknowledgedCounter = nil
+        expectedDownloadCounter = 0
         recentlyAcknowledgedCounters = []
         downloadExpectedSize = expectedSize
         downloadCompletion = completion
@@ -268,7 +266,6 @@ final class FlySightBLEClient: NSObject, ObservableObject {
         case 0x10:
             guard data.count >= 2, downloadCompletion != nil else { return }
             let counter = data[1]
-            if expectedDownloadCounter == nil { expectedDownloadCounter = counter }
             if recentlyAcknowledgedCounters.contains(counter) {
                 // Re-acknowledge any duplicate still inside the receive window.
                 // Never append duplicate payload bytes to the downloaded file.
@@ -285,7 +282,6 @@ final class FlySightBLEClient: NSObject, ObservableObject {
             if let tx = characteristics[filePacketIn] {
                 peripheral?.writeValue(Data([0x12, counter]), for: tx, type: .withoutResponse)
             }
-            lastAcknowledgedCounter = counter
             recentlyAcknowledgedCounters.append(counter)
             if recentlyAcknowledgedCounters.count > 8 {
                 recentlyAcknowledgedCounters.removeFirst(recentlyAcknowledgedCounters.count - 8)
