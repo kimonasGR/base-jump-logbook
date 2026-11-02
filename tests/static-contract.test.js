@@ -573,3 +573,29 @@ test('analytics view summarizes historical jumps by year, object, jump type, sui
   assert.match(ui, /Data completeness/);
   assert.match(ui, /descriptive summaries of saved records, not predictions or safety assessments/);
 });
+
+
+test('FlySight iTOW millisecond values are normalized before timing calculations', () => {
+  assert.match(ui, /timeKey==='itow'&&number\(row\[timeKey\]\)!==null\?String\(number\(row\[timeKey\]\)\/1000\)/);
+  const timeSource = ui.match(/function trackTimeMs\(value\)\{[^\n]*\}/)?.[0];
+  assert.ok(timeSource, 'trackTimeMs helper must exist');
+  const trackTimeMs = new Function(timeSource + '; return trackTimeMs;')();
+  assert.equal(trackTimeMs('345000'), 345000000);
+  assert.equal(trackTimeMs('345001'), 345001000);
+  assert.equal((trackTimeMs('345001') - trackTimeMs('345000')) / 1000, 1);
+});
+
+test('FlySight maximum speed uses each segment distance, not cumulative distance', () => {
+  const timeSource = ui.match(/function trackTimeMs\(value\)\{[^\n]*\}/)?.[0];
+  const summarySource = ui.match(/function summarizeTrack\(points\)\{[^\n]*\}/)?.[0];
+  assert.ok(timeSource && summarySource, 'track timing and summary helpers must exist');
+  const summarizeTrack = new Function(timeSource + ';' + summarySource + '; return summarizeTrack;')();
+  const result = summarizeTrack([
+    { lat: 0, lon: 0, time: '2026-01-01T00:00:00Z' },
+    { lat: 0, lon: 0.001, time: '2026-01-01T00:00:01Z' },
+    { lat: 0, lon: 0.003, time: '2026-01-01T00:00:02Z' }
+  ]);
+  assert.ok(result.distanceMeters > 330 && result.distanceMeters < 340);
+  assert.ok(result.maxSpeedMps > 220 && result.maxSpeedMps < 225);
+  assert.ok(result.durationSeconds === 2);
+});
