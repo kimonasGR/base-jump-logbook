@@ -325,6 +325,16 @@ test('FlySight TRACK.CSV parser ignores empty numeric coordinates instead of con
   assert.equal(points[0].lon,7);
 });
 
+test('FlySight import summary shows firmware and schema provenance', () => {
+  assert.match(ui, /function flySightDeviceHtml\(info\)/);
+  const start=ui.indexOf('function flySightDeviceHtml(');
+  const end=ui.indexOf('function sensorSummaryHtml(',start);
+  const render=new Function('esc',ui.slice(start,end)+';return flySightDeviceHtml;')(value=>String(value).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'));
+  const html=render({firmwareVersion:'v2024.05.25',schemaVersion:'2'});
+  assert.match(html,/Firmware v2024\.05\.25/);
+  assert.match(html,/Data schema 2/);
+});
+
 test('FlySight sensor summary displays units and min/average/max without retaining raw sensor time series', () => {
   assert.match(ui, /function sensorSummaryHtml\(data\)/);
   assert.match(ui, /Minimum \/ average \/ maximum/);
