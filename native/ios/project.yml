@@ -11,6 +11,10 @@ targets:
       - path: FlySightLogbookApp.swift
       - path: FlySightConnectionView.swift
       - path: FlySightBLEClient.swift
+    info:
+      properties:
+        UIBackgroundModes:
+          - bluetooth-central
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.kimonasgr.basejumplogbook
