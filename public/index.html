@@ -389,9 +389,13 @@ async function enterApp(){
     if(localHasData){
       let backupTime;
       try{backupTime=window.createLocalRecoveryBackup()}catch(e){throw Error('Could not create a safety backup, so local data was not replaced. Export a JSON backup manually before continuing. '+e.message)}
-      if(!confirm('A cloud logbook already exists. A recovery backup of this device has been saved locally ('+backupTime+'). Load the cloud copy and replace the current local records?'))throw Error('Cloud data was not loaded. Your local records remain unchanged; a recovery backup is also available in this browser.');
-    }
-    window.setCloudSnapshot(cloud.snapshot);
+      const loadCloud=confirm('A cloud logbook already exists. A recovery backup of this device has been saved locally ('+backupTime+'). Choose OK to load the cloud copy and replace this device’s records. Choose Cancel to keep this device’s records and upload them to the cloud.');
+      if(loadCloud)window.setCloudSnapshot(cloud.snapshot);
+      else{
+        const saved=await api('/api/snapshot',{method:'PUT',body:JSON.stringify({...local,expectedUpdatedAt:cloud.updatedAt||null})});
+        cloudUpdatedAt=saved.updatedAt;
+      }
+    }else window.setCloudSnapshot(cloud.snapshot);
   }else{
     const initial=await api('/api/snapshot',{method:'PUT',body:JSON.stringify({...window.getLocalSnapshot(),expectedUpdatedAt:null})});
     cloudUpdatedAt=initial.updatedAt;
