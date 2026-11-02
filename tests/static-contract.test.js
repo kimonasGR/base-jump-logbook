@@ -298,6 +298,9 @@ test('FlySight 2 SENSOR.CSV parser handles BOM, CRLF, sensor prefixes and empty 
   assert.equal(parsed.variables.IMU,'Inertial measurement unit');
   assert.deepEqual(parsed.sensors.IMU.units,['ms','m/s2','m/s2','m/s2']);
   assert.equal(parsed.sensors.IMU.measurements.acc_x.average,3);
+  assert.equal(parsed.sensors.IMU.sampleRateHz,10);
+  assert.equal(parsed.sensors.IMU.durationSeconds,0.1);
+  assert.equal(parsed.sensors.IMU.measurements.time,undefined);
   assert.equal(parsed.sensors.IMU.measurements.acc_y.average,7);
   assert.equal(parsed.sensors.IMU.missingValues,1);
   assert.equal(parsed.sensors.IMU.validValues,7);
