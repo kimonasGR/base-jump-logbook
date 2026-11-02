@@ -342,8 +342,8 @@ test('FlySight 2 SENSOR.CSV imports sensor schemas, units, variables and samples
 });
 test('FlySight import accepts TRACK and SENSOR files together', () => {
   assert.match(ui, /id="flySight" type="file" accept="\.gpx,\.csv" multiple/);
-  assert.match(ui, /trackDraft\.sensorData\?'<div class=/);
-  assert.match(ui, /Sensor files imported:/);
+  assert.match(ui, /sensorSummaryHtml\(trackDraft\.sensorData\)/);
+  assert.match(ui, /FlySight sensor summary/);
 });
 
 test('FlySight import reverse-geocodes GPS coordinates into country field', () => {
@@ -373,8 +373,8 @@ test('FlySight 2 SENSOR.CSV imports sensor schemas, units, variables and samples
 });
 test('FlySight import accepts TRACK and SENSOR files together', () => {
   assert.match(ui, /id="flySight" type="file" accept="\.gpx,\.csv" multiple/);
-  assert.match(ui, /trackDraft\.sensorData\?'<div class=/);
-  assert.match(ui, /Sensor files imported:/);
+  assert.match(ui, /sensorSummaryHtml\(trackDraft\.sensorData\)/);
+  assert.match(ui, /FlySight sensor summary/);
 });
 
 
