@@ -48,7 +48,7 @@ function sensorSummaryHtml(data){
       const fmt=value=>Number.isFinite(Number(value))?Number(value).toFixed(2):'—';
       return '<div class="row between small"><span>'+esc(key)+(unit?' · '+esc(unit):'')+'</span><span>'+fmt(m.min)+' / '+fmt(m.average)+' / '+fmt(m.max)+'</span></div>';
     }).join('');
-    const quality=[sensor.samples+' samples',sensor.validValues+' numeric values',sensor.missingValues+' blank',sensor.invalidValues+' non-numeric'].join(' · ');
+    const quality=[sensor.samples+' samples',sensor.sampleRateHz!=null?sensor.sampleRateHz.toFixed(1)+' Hz':null,sensor.durationSeconds!=null?sensor.durationSeconds.toFixed(1)+' s':null,sensor.validValues+' values',sensor.missingValues+' blank',sensor.invalidValues+' invalid'].filter(Boolean).join(' · ');
     return '<div class="section"><b>'+esc(name)+'</b><div class="muted small">'+quality+'</div>'+metrics+'</div>';
   }).join('');
   return '<div class="note"><b>FlySight sensor summary</b><div class="muted small">Minimum / average / maximum</div>'+sections+'</div>';
@@ -158,7 +158,17 @@ function parseFlySightSensorCsv(raw){
     const a=splitCsvLine(line),name=(a[0]||'').trim().replace(/^\$/,'').toUpperCase(),sensor=sensors[name];
     if(!sensor||a.length!==sensor.headers.length+1)continue;
     sensor.samples++;
+    const timeIndex=sensor.headers.indexOf('time');
+    if(timeIndex>=0){
+      const timeValue=Number(String(a[timeIndex+1]??'').trim());
+      if(Number.isFinite(timeValue)){
+        const unit=(sensor.units[timeIndex]||'s').trim().toLowerCase(),timeSeconds=unit==='ms'?timeValue/1000:timeValue;
+        sensor.timeStartSeconds=sensor.timeStartSeconds==null?timeSeconds:Math.min(sensor.timeStartSeconds,timeSeconds);
+        sensor.timeEndSeconds=sensor.timeEndSeconds==null?timeSeconds:Math.max(sensor.timeEndSeconds,timeSeconds);
+      }
+    }
     sensor.headers.forEach((h,i)=>{
+      if(h==='time')return;
       const rawValue=String(a[i+1]??'').trim();
       if(!rawValue){sensor.missingValues++;return;}
       const n=Number(rawValue);
@@ -169,7 +179,7 @@ function parseFlySightSensorCsv(raw){
   }
   const totalSamples=Object.values(sensors).reduce((n,s)=>n+s.samples,0);
   if(!totalSamples)throw Error('No sensor samples found in SENSOR.CSV.');
-  for(const sensor of Object.values(sensors))for(const m of Object.values(sensor.measurements))m.average=m.count?m.sum/m.count:null;
+  for(const sensor of Object.values(sensors)){for(const m of Object.values(sensor.measurements))m.average=m.count?m.sum/m.count:null;if(sensor.timeStartSeconds!=null&&sensor.timeEndSeconds!=null){sensor.durationSeconds=Math.max(0,sensor.timeEndSeconds-sensor.timeStartSeconds);sensor.sampleRateHz=sensor.durationSeconds>0?(sensor.samples-1)/sensor.durationSeconds:null;}}
   return {metadata:parseFlySightMetadata(raw),variables,sensors,totalSamples};
 }
 function parseFlySightGpx(raw){const doc=new DOMParser().parseFromString(raw,'application/xml');if(doc.querySelector('parsererror'))throw Error('Invalid GPX XML file.');const points=[...doc.querySelectorAll('trkpt,rtept,wpt')].map(el=>{const lat=Number(el.getAttribute('lat')),lon=Number(el.getAttribute('lon')),ele=Number(el.querySelector('ele')?.textContent),time=el.querySelector('time')?.textContent;return {lat,lon,...(Number.isFinite(ele)?{alt:ele}:{}),...(time?{time}:{})}}).filter(p=>Number.isFinite(p.lat)&&Number.isFinite(p.lon)&&Math.abs(p.lat)<=90&&Math.abs(p.lon)<=180).slice(0,10000);if(!points.length)throw Error('No GPS track points found in GPX.');return points}
