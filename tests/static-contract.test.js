@@ -656,7 +656,7 @@ test('FlySight iTOW timestamps unwrap GPS-week rollover for continuous track tim
 test('FlySight track summary reports GPS fix, satellite, accuracy and timing-gap quality metrics', () => {
   const timeSource=ui.match(/function trackTimeMs\(value\)\{[^\n]*\}/)?.[0];
   const start=ui.indexOf('function summarizeTrack(');
-  const end=ui.indexOf('function trackQualityHtml(',start);
+  const end=ui.indexOf('function renderAnalytics(',start);
   const summarizeSource=ui.slice(start,end);
   const summarize=new Function(timeSource+';'+summarizeSource+';return summarizeTrack;')();
   const result=summarize([
@@ -678,8 +678,10 @@ test('FlySight track summary reports GPS fix, satellite, accuracy and timing-gap
 
 test('FlySight maximum speed uses each segment distance, not cumulative distance', () => {
   const timeSource = ui.match(/function trackTimeMs\(value\)\{[^\n]*\}/)?.[0];
-  const summarySource = ui.match(/function summarizeTrack\(points\)\{[^\n]*\}/)?.[0];
-  assert.ok(timeSource && summarySource, 'track timing and summary helpers must exist');
+  const summaryStart=ui.indexOf('function summarizeTrack(');
+  const summaryEnd=ui.indexOf('function renderAnalytics(',summaryStart);
+  const summarySource=ui.slice(summaryStart,summaryEnd);
+  assert.ok(timeSource && summarySource.includes('function summarizeTrack'), 'track timing and summary helpers must exist');
   const summarizeTrack = new Function(timeSource + ';' + summarySource + '; return summarizeTrack;')();
   const result = summarizeTrack([
     { lat: 0, lon: 0, time: '2026-01-01T00:00:00Z' },
