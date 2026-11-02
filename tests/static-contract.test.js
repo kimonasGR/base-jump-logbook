@@ -559,6 +559,11 @@ test('jump logbook exposes a working suit filter alongside country and object ty
 });
 
 
+test('analytics FlySight count reads the saved track summary point count', () => {
+  assert.match(ui, /Number\\(j\\.flysightTrack\\?\\.stats\\?\\.points\\)>0/);
+  assert.match(ui, /Array\\.isArray\\(j\\.flysightTrack\\?\\.trackPoints\\)/);
+});
+
 test('analytics view summarizes historical jumps by year, object, jump type, suit and rig', () => {
   assert.match(ui, /data-view="analytics"/);
   assert.match(ui, /function renderAnalytics\(\)/);
