@@ -8,6 +8,7 @@ const migration = await readFile(new URL('../migrations/001_initial.sql', import
 const flySightMigration = await readFile(new URL('../migrations/002_flysight_handoff.sql', import.meta.url), 'utf8');
 const mediaMigration = await readFile(new URL('../migrations/003_user_media.sql', import.meta.url), 'utf8');
 const nativeFlySight = await readFile(new URL('../native/ios/FlySightConnectionView.swift', import.meta.url), 'utf8');
+const nativeFlySightBLE = await readFile(new URL('../native/ios/FlySightBLEClient.swift', import.meta.url), 'utf8');
 const vercel = JSON.parse(await readFile(new URL('../vercel.json', import.meta.url), 'utf8'));
 
 test('all private data routes require authenticated user middleware', () => {
@@ -612,4 +613,19 @@ test('wind speed is recorded with an explicit unit and validates non-negative nu
   assert.match(ui, /id="windUnit" name="windUnit"/);
   assert.match(ui, /\['Wind speed',d\.windSpeed\]/);
   assert.match(ui, /windUnit:\'m\/s\'/);
+});
+
+
+test('FlySight receive path re-acknowledges duplicates within its eight-packet window', () => {
+  assert.match(nativeFlySightBLE, /private var recentlyAcknowledgedCounters: \[UInt8\] = \[\]/);
+  assert.match(nativeFlySightBLE, /recentlyAcknowledgedCounters\.contains\(counter\)/);
+  assert.match(nativeFlySightBLE, /recentlyAcknowledgedCounters\.count > 8/);
+  assert.match(nativeFlySightBLE, /expectedDownloadCounter = counter &\+ 1/);
+  assert.match(nativeFlySightBLE, /guard counter == expectedDownloadCounter/);
+});
+
+test('FlySight directory completion always stops timeout and keep-alive tasks', () => {
+  const completion = nativeFlySightBLE.match(/private func finishDirectory\(_ result: Result<\[FlySightFile\], Error>\) \{([\s\S]*?)\n    \}/)?.[1] || '';
+  assert.match(completion, /stopTransferTimers\(\)/);
+  assert.match(completion, /directoryCompletion = nil/);
 });
