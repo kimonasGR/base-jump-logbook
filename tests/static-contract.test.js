@@ -557,3 +557,14 @@ test('jump logbook exposes a working suit filter alongside country and object ty
   assert.match(ui, /&&\(!filterSuit\|\|j\.suit===filterSuit\)/);
   assert.match(ui, /query=filterCountry=filterType=filterSuit=''/);
 });
+
+
+test('analytics view summarizes historical jumps by year, object, jump type, suit and rig', () => {
+  assert.match(ui, /data-view="analytics"/);
+  assert.match(ui, /function renderAnalytics\(\)/);
+  assert.match(ui, /Jumps by year/);
+  assert.match(ui, /Most visited objects/);
+  assert.match(ui, /Jump types/);
+  assert.match(ui, /Data completeness/);
+  assert.match(ui, /descriptive summaries of saved records, not predictions or safety assessments/);
+});
