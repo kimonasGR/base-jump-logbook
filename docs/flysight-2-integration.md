@@ -27,7 +27,7 @@ Based on the FlySight 2 firmware BLE developer documentation:
 7. Treat `0xf0` as command rejection and `0xf1` as command acknowledgement. The prototype also applies a 30-second transfer timeout and supports `0xff` cancellation.
 8. Save downloaded files in the app's Documents directory. The native screen lets the user select `TRACK.CSV` and `SENSOR.CSV` together and share both files in one share-sheet action. The user then selects both in the web logbook's existing multi-file import control. The source files on the FlySight are never modified or deleted.
 
-The protocol documentation specifies Go-Back-N with a window of eight packets and 242-byte frames. The client now tracks sequential receive counters, re-acknowledges the immediately previous duplicate without appending it twice, leaves out-of-order packets unacknowledged, and sends a 15-second keep-alive. This is not yet a proven full Go-Back-N implementation: counter wrap, older duplicates, retransmission timing, negotiated MTU edge cases, and long-transfer reliability still require validation against hardware and firmware.
+The protocol documentation specifies Go-Back-N with a window of eight packets and 242-byte frames. The client tracks sequential receive counters, re-acknowledges duplicates still inside an eight-packet receive window without appending them twice, leaves future/out-of-window packets unacknowledged, and sends a 15-second keep-alive. Directory completion and failure now stop both transfer timers. This is not yet a proven full Go-Back-N implementation: counter wrap, older duplicates, retransmission timing, negotiated MTU edge cases, and long-transfer reliability still require validation against hardware and firmware.
 
 ## Planned import workflow
 

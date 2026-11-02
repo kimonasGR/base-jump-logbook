@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
+import { runInNewContext } from 'node:vm';
 
 const server = await readFile(new URL('../src/server.js', import.meta.url), 'utf8');
 const ui = await readFile(new URL('../public/index.html', import.meta.url), 'utf8');
@@ -8,6 +9,7 @@ const migration = await readFile(new URL('../migrations/001_initial.sql', import
 const flySightMigration = await readFile(new URL('../migrations/002_flysight_handoff.sql', import.meta.url), 'utf8');
 const mediaMigration = await readFile(new URL('../migrations/003_user_media.sql', import.meta.url), 'utf8');
 const nativeFlySight = await readFile(new URL('../native/ios/FlySightConnectionView.swift', import.meta.url), 'utf8');
+const nativeFlySightBLE = await readFile(new URL('../native/ios/FlySightBLEClient.swift', import.meta.url), 'utf8');
 const vercel = JSON.parse(await readFile(new URL('../vercel.json', import.meta.url), 'utf8'));
 
 test('all private data routes require authenticated user middleware', () => {
@@ -523,4 +525,178 @@ test('weather conditions use structured sky, lighting, wind strength and compass
   assert.match(ui, /selectField\('Wind direction','windDirection',j\.windDirection,'windDirection'\)/);
   assert.match(ui, /windDirection:\['N','NE','E','SE','S','SW','W','NW','Variable'\]/);
   assert.doesNotMatch(ui, /03 · Flight & deployment[\s\S]{0,250}field\('Wind strength'/);
+});
+
+
+test('PWA manifest declares a standalone mobile app with a valid icon', async () => {
+  const manifest = JSON.parse(await readFile(new URL('../public/manifest.webmanifest', import.meta.url), 'utf8'));
+  assert.equal(manifest.name, 'BASE Jump Logbook');
+  assert.equal(manifest.display, 'standalone');
+  assert.equal(manifest.start_url, '/');
+  assert.ok(manifest.icons.some(icon => icon.src === '/icons/base-logbook.svg'));
+});
+
+test('service worker caches only the app shell and never intercepts API requests', async () => {
+  const sw = await readFile(new URL('../public/sw.js', import.meta.url), 'utf8');
+  assert.match(sw, /base-logbook-shell-v1/);
+  assert.match(sw, /url\.pathname\.startsWith\('\/api\/'\)/);
+  assert.match(sw, /request\.mode === 'navigate'/);
+  assert.match(sw, /caches\.match\('\/'\)/);
+});
+
+test('mobile app metadata and secure service worker registration are present', () => {
+  assert.match(ui, /apple-mobile-web-app-capable/);
+  assert.match(ui, /rel="manifest" href="\/manifest\.webmanifest"/);
+  assert.match(ui, /navigator\.serviceWorker\.register\('\/sw\.js'/);
+  assert.match(ui, /location\.protocol === 'https:'/);
+});
+
+
+test('jump logbook exposes a working suit filter alongside country and object type', () => {
+  assert.match(ui, /id="suitFilter"/);
+  assert.match(ui, /filterSuit===c\?'selected':''/);
+  assert.match(ui, /suit\.onchange=\(\)=>\{filterSuit=suit\.value;render\(\)\}/);
+  assert.match(ui, /&&\(!filterSuit\|\|j\.suit===filterSuit\)/);
+  assert.match(ui, /query=filterCountry=filterType=filterSuit=''/);
+});
+
+
+test('analytics FlySight count reads the saved track summary point count', () => {
+  assert.match(ui, /Number\(j\.flysightTrack\?\.stats\?\.points\)>0/);
+  assert.match(ui, /Array\.isArray\(j\.flysightTrack\?\.trackPoints\)/);
+});
+
+test('analytics view summarizes historical jumps by year, object, jump type, suit and rig', () => {
+  assert.match(ui, /data-view="analytics"/);
+  assert.match(ui, /function renderAnalytics\(\)/);
+  assert.match(ui, /Jumps by year/);
+  assert.match(ui, /Most visited objects/);
+  assert.match(ui, /Jump types/);
+  assert.match(ui, /Data completeness/);
+  assert.match(ui, /descriptive summaries of saved records, not predictions or safety assessments/);
+});
+
+
+test('FlySight iTOW millisecond values are normalized before timing calculations', () => {
+  assert.match(ui, /timeKey==='itow'&&number\(row\[timeKey\]\)!==null\?String\(number\(row\[timeKey\]\)\/1000\)/);
+  const timeSource = ui.match(/function trackTimeMs\(value\)\{[^\n]*\}/)?.[0];
+  assert.ok(timeSource, 'trackTimeMs helper must exist');
+  const trackTimeMs = new Function(timeSource + '; return trackTimeMs;')();
+  assert.equal(trackTimeMs('345000'), 345000000);
+  assert.equal(trackTimeMs('345001'), 345001000);
+  assert.equal((trackTimeMs('345001') - trackTimeMs('345000')) / 1000, 1);
+});
+
+test('FlySight iTOW timestamps unwrap GPS-week rollover for continuous track timing', () => {
+  assert.match(ui, /if\(timeKey==='itow'\)\{\s*let weekOffset=0,lastRaw=null/);
+  assert.match(ui, /lastRaw-raw>302400\)weekOffset\+=604800/);
+  assert.match(ui, /point\.time=String\(raw\+weekOffset\)/);
+});
+
+test('FlySight maximum speed uses each segment distance, not cumulative distance', () => {
+  const timeSource = ui.match(/function trackTimeMs\(value\)\{[^\n]*\}/)?.[0];
+  const summarySource = ui.match(/function summarizeTrack\(points\)\{[^\n]*\}/)?.[0];
+  assert.ok(timeSource && summarySource, 'track timing and summary helpers must exist');
+  const summarizeTrack = new Function(timeSource + ';' + summarySource + '; return summarizeTrack;')();
+  const result = summarizeTrack([
+    { lat: 0, lon: 0, time: '2026-01-01T00:00:00Z' },
+    { lat: 0, lon: 0.001, time: '2026-01-01T00:00:01Z' },
+    { lat: 0, lon: 0.003, time: '2026-01-01T00:00:02Z' }
+  ]);
+  assert.ok(result.distanceMeters > 330 && result.distanceMeters < 340);
+  assert.ok(result.maxSpeedMps > 220 && result.maxSpeedMps < 225);
+  assert.ok(result.durationSeconds === 2);
+});
+
+
+test('wind speed is recorded with an explicit unit and validates non-negative numeric values', () => {
+  assert.match(ui, /field\('Wind speed \('\+\(j\.windUnit\|\|db\.settings\.windUnit\)\+'\)','windSpeed',j\.windSpeed\?\?''/);
+  assert.match(ui, /id="windUnit" name="windUnit"/);
+  assert.match(ui, /\['Wind speed',d\.windSpeed\]/);
+  assert.match(ui, /windUnit:\'m\/s\'/);
+});
+
+
+test('FlySight receive path re-acknowledges duplicates within its eight-packet window', () => {
+  assert.match(nativeFlySightBLE, /private var recentlyAcknowledgedCounters: \[UInt8\] = \[\]/);
+  assert.match(nativeFlySightBLE, /recentlyAcknowledgedCounters\.contains\(counter\)/);
+  assert.match(nativeFlySightBLE, /recentlyAcknowledgedCounters\.count > 8/);
+  assert.match(nativeFlySightBLE, /expectedDownloadCounter = counter &\+ 1/);
+  assert.match(nativeFlySightBLE, /guard counter == expectedDownloadCounter/);
+});
+
+test('FlySight directory completion always stops timeout and keep-alive tasks', () => {
+  const completion = nativeFlySightBLE.match(/private func finishDirectory\(_ result: Result<\[FlySightFile\], Error>\) \{([\s\S]*?)\n    \}/)?.[1] || '';
+  assert.match(completion, /stopTransferTimers\(\)/);
+  assert.match(completion, /directoryCompletion = nil/);
+});
+
+
+test('offline PWA falls back to the local logbook when the Auth CDN or API is unavailable', () => {
+  assert.match(ui, /let neonAuth=null/);
+  assert.match(ui, /await import\('https:\/\/esm\.sh\/@neondatabase\/auth'\)/);
+  assert.match(ui, /function enterOfflineMode\(\)/);
+  assert.match(ui, /if\(!auth\)\{enterOfflineMode\(\);return\}/);
+  assert.match(ui, /Offline mode · records stay on this device/);
+  assert.match(ui, /navigator\.onLine===false\|\|!error\.status\|\|error\.status>=500/);
+});
+
+
+test('service worker runtime caches the shell, preserves unrelated caches and serves offline navigation', async () => {
+  const source = await readFile(new URL('../public/sw.js', import.meta.url), 'utf8');
+  const listeners = {};
+  const entries = new Map();
+  const deleted = [];
+  const cache = {
+    async addAll(paths) { for (const path of paths) entries.set(path, new Response('shell:' + path)); },
+    async put(key, response) { entries.set(typeof key === 'string' ? key : key.url, response); },
+    async match(key) { return entries.get(typeof key === 'string' ? key : key.url) || null; }
+  };
+  const caches = {
+    async open() { return cache; },
+    async match(key) { return cache.match(key); },
+    async keys() { return ['base-logbook-shell-old', 'unrelated-app-cache']; },
+    async delete(key) { deleted.push(key); return true; }
+  };
+  const self = {
+    location: { origin: 'https://logbook.test' },
+    clients: { async claim() {} },
+    async skipWaiting() {},
+    addEventListener(type, listener) { listeners[type] = listener; }
+  };
+  runInNewContext(source, {
+    self, caches, URL, Response,
+    fetch: async () => { throw new Error('network offline'); }
+  });
+
+  let installTask;
+  listeners.install({ waitUntil(task) { installTask = task; } });
+  await installTask;
+  assert.deepEqual([...entries.keys()].sort(), ['/', '/icons/base-logbook.svg', '/index.html', '/manifest.webmanifest'].sort());
+
+  let activateTask;
+  listeners.activate({ waitUntil(task) { activateTask = task; } });
+  await activateTask;
+  assert.deepEqual(deleted, ['base-logbook-shell-old']);
+
+  let intercepted = false;
+  listeners.fetch({
+    request: { method: 'GET', url: 'https://logbook.test/api/health', mode: 'cors', destination: '' },
+    respondWith() { intercepted = true; }
+  });
+  assert.equal(intercepted, false, 'API requests must bypass the app-shell cache');
+
+  listeners.fetch({
+    request: { method: 'POST', url: 'https://logbook.test/jumps', mode: 'cors', destination: '' },
+    respondWith() { intercepted = true; }
+  });
+  assert.equal(intercepted, false, 'non-GET requests must bypass the app-shell cache');
+
+  let navigationResponse;
+  listeners.fetch({
+    request: { method: 'GET', url: 'https://logbook.test/', mode: 'navigate', destination: 'document' },
+    respondWith(task) { navigationResponse = task; }
+  });
+  const response = await navigationResponse;
+  assert.equal(await response.text(), 'shell:/');
 });
