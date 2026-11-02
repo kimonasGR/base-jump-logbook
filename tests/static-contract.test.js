@@ -396,38 +396,6 @@ test('FlySight import accepts TRACK and SENSOR files together', () => {
   assert.match(ui, /FlySight sensor summary/);
 });
 
-test('FlySight import reverse-geocodes GPS coordinates into country field', () => {
-  assert.match(ui, /window\.lookupCountry=async\(latitude,longitude\)=>/);
-  assert.match(ui, /const place=await window\.lookupCountry\?\.\(points\[0\]\.lat,points\[0\]\.lon\)/);
-  assert.match(ui, /Authorization:'Bearer '\+bearer/);
-  assert.match(ui, /if\(place&&!form\.elements\.country\.value\.trim\(\)\)\{form\.elements\.country\.value=place/);
-});
-test('FlySight 2 vertical velocity sign is normalized for descent detection', () => {
-  assert.match(ui, /Number\.isFinite\(p\.velD\)\?-p\.velD/);
-});
-test('Reverse geocoding is authenticated and validates coordinates', () => {
-  assert.match(server, /app\.get\('\/api\/geocode\/reverse', requireUser/);
-  assert.match(server, /Math\.abs\(latitude\)>90/);
-  assert.match(server, /address\?\.country/);
-});
-
-test('FlySight 2 SENSOR.CSV imports sensor schemas, units, variables and samples', () => {
-  assert.match(ui, /function parseFlySightSensorCsv\(raw\)/);
-  assert.match(ui, /a\[0\]==='\$COL'/);
-  assert.match(ui, /a\[0\]==='\$UNIT'/);
-  assert.match(ui, /a\[0\]==='\$VAR'/);
-  assert.match(ui, /sensor\.samples\+\+/);
-  assert.match(ui, /m\.min=Math\.min\(m\.min,n\)/);
-  assert.match(ui, /m\.average=m\.count\?m\.sum\/m\.count:null/);
-  assert.match(ui, /name==='SENSOR\.CSV'\|\|name\.includes\('SENSOR'\)/);
-});
-test('FlySight import accepts TRACK and SENSOR files together', () => {
-  assert.match(ui, /id="flySight" type="file" accept="\.gpx,\.csv" multiple/);
-  assert.match(ui, /sensorSummaryHtml\(trackDraft\.sensorData\)/);
-  assert.match(ui, /FlySight sensor summary/);
-});
-
-
 test('native FlySight browser navigates date/session folders and downloads full file paths', () => {
   assert.match(nativeFlySightBLE, /var isDirectory: Bool \{ attributes & 0x10 != 0 \}/);
   assert.match(nativeFlySightBLE, /listingPath/);
