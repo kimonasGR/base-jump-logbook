@@ -283,6 +283,37 @@ test('Reverse geocoding is authenticated and validates coordinates', () => {
   assert.match(server, /address\?\.country/);
 });
 
+test('FlySight 2 SENSOR.CSV parser handles BOM, CRLF, sensor prefixes and empty values', () => {
+  const splitStart=ui.indexOf('function splitCsvLine(');
+  const trackStart=ui.indexOf('function parseFlySightCsv(');
+  const sensorStart=ui.indexOf('function parseFlySightSensorCsv(');
+  const gpxStart=ui.indexOf('function parseFlySightGpx(');
+  const splitSource=ui.slice(splitStart,trackStart);
+  const sensorSource=ui.slice(sensorStart,gpxStart);
+  const parseSensor=new Function(splitSource+sensorSource+';return parseFlySightSensorCsv;')();
+  const raw='\uFEFF$FLYS,2\\r\\n$VAR,IMU,Inertial measurement unit\\r\\n$COL,IMU,TIME,ACC_X,ACC_Y,ACC_Z\\r\\n$UNIT,IMU,ms,m/s2,m/s2,m/s2\\r\\n$DATA\\r\\n$IMU,100,1,,3\\r\\n$IMU,200,5,7,9\\r\\n';
+  const parsed=parseSensor(raw);
+  assert.equal(parsed.totalSamples,2);
+  assert.equal(parsed.variables.IMU,'Inertial measurement unit');
+  assert.deepEqual(parsed.sensors.IMU.units,['ms','m/s2','m/s2','m/s2']);
+  assert.equal(parsed.sensors.IMU.measurements.acc_x.average,3);
+  assert.equal(parsed.sensors.IMU.measurements.acc_y.average,7);
+  assert.equal(parsed.sensors.IMU.missingValues,1);
+  assert.equal(parsed.sensors.IMU.validValues,7);
+});
+
+test('FlySight TRACK.CSV parser ignores empty numeric coordinates instead of converting them to zero', () => {
+  const splitStart=ui.indexOf('function splitCsvLine(');
+  const trackStart=ui.indexOf('function parseFlySightCsv(');
+  const sensorStart=ui.indexOf('function parseFlySightSensorCsv(');
+  const parseTrack=new Function(ui.slice(splitStart,trackStart)+ui.slice(trackStart,sensorStart)+';return parseFlySightCsv;')();
+  const raw='$FLYS,2\\r\\n$COL,GNSS,ITOW,LAT,LON,HMSL,VELD\\r\\n$DATA\\r\\n$GNSS,1000,45,7,1200,5\\r\\n$GNSS,2000,,,1190,6\\r\\n';
+  const points=parseTrack(raw);
+  assert.equal(points.length,1);
+  assert.equal(points[0].lat,45);
+  assert.equal(points[0].lon,7);
+});
+
 test('FlySight 2 SENSOR.CSV imports sensor schemas, units, variables and samples', () => {
   assert.match(ui, /function parseFlySightSensorCsv\(raw\)/);
   assert.match(ui, /a\[0\]==='\$COL'/);
