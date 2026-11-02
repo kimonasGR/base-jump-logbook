@@ -336,12 +336,12 @@ test('native FlySight browser navigates date/session folders and downloads full 
   assert.match(nativeFlySightBLE, /listingPath/);
   assert.match(nativeFlySightBLE, /let fullPath = parent\.isEmpty \? "\/" \+ name : "\/" \+ parent \+ "\/" \+ name/);
   assert.match(nativeFlySightBLE, /var id: String \{ path \}/);
-  assert.match(nativeFlySightView, /currentDirectory = "\/"/);
-  assert.match(nativeFlySightView, /files\.filter\(\\\.isDirectory\)/);
-  assert.match(nativeFlySightView, /readDirectory\(folder\.path\)/);
-  assert.match(nativeFlySightView, /downloadFile\(path: file\.path/);
-  assert.match(nativeFlySightView, /Select files from one FlySight session only/);
-  assert.match(nativeFlySightView, /FlySight Imports/);
+  assert.match(nativeFlySight, /currentDirectory = "\/"/);
+  assert.match(nativeFlySight, /files\.filter\(\\\.isDirectory\)/);
+  assert.match(nativeFlySight, /readDirectory\(folder\.path\)/);
+  assert.match(nativeFlySight, /downloadFile\(path: file\.path/);
+  assert.match(nativeFlySight, /Select files from one FlySight session only/);
+  assert.match(nativeFlySight, /FlySight Imports/);
 });
 
 test('native FlySight upload retries transient HTTP and transport failures', () => {
