@@ -21,15 +21,9 @@ jobs:
       - run: npm install
       - run: npm test
 
-  ios-source:
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Type-check native iOS sources
-        run: xcrun --sdk iphonesimulator swiftc -typecheck -target arm64-apple-ios17.0-simulator native/ios/FlySightBLEClient.swift native/ios/FlySightConnectionView.swift native/ios/FlySightLogbookApp.swift
-
   ios-app-build:
     runs-on: macos-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - name: Install XcodeGen
