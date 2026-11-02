@@ -528,7 +528,7 @@ test('XLSX ZIP archive is preflighted before decompression', () => {
   const end=server.indexOf("app.post('/api/logbook/import-analyze'",start);
   const helper=server.slice(start,end);
   assert.ok(start>=0&&end>start);
-  for(const fragment of ['0x06054b50','0x02014b50','entries>1000','flags&1','expanded/compressed>200','expanded>16*1024*1024','totalExpanded>32*1024*1024']) {
+  for(const fragment of ['0x06054b50','0x02014b50','0x04034b50','entries>1000','flags&1','localOffset+30>directoryOffset','localNameLength!==nameLength','dataStart+compressed>directoryOffset','expanded/compressed>200','expanded>16*1024*1024','totalExpanded>32*1024*1024']) {
     assert.ok(helper.includes(fragment),'Missing ZIP archive guard: '+fragment);
   }
   assert.ok(server.includes('validateXlsxZip(bytes);'));
