@@ -385,7 +385,6 @@ toggle.onclick=()=>{creating=!creating;document.getElementById('authName').paren
 document.getElementById('authName').parentElement.style.display='none';
 document.getElementById('authPassword').addEventListener('keydown',e=>{if(e.key==='Enter')submit.click()});
 (async()=>{try{await enterApp()}catch(e){status.textContent='Sign in required';gate.style.display='flex';if(!/No active session/.test(e.message))showError(e)}})();
-</script><script>
 if ('serviceWorker' in navigator && location.protocol === 'https:') {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(error => {
