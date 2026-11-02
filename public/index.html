@@ -74,6 +74,18 @@ function parseFlySightCsv(raw){
     const downKey=find(['veld','vel_d','velocity down','down velocity']);if(downKey)p.velD=number(row[downKey]);
     return p;
   }).filter(p=>p.lat!==null&&p.lon!==null&&Math.abs(p.lat)<=90&&Math.abs(p.lon)<=180).slice(0,10000);
+  // FlySight iTOW is milliseconds within the GPS week. Unwrap the week boundary
+  // so a track spanning Sunday/Monday still has monotonically increasing times.
+  if(timeKey==='itow'){
+    let weekOffset=0,lastRaw=null;
+    for(const point of points){
+      const raw=Number(point.time);
+      if(!Number.isFinite(raw))continue;
+      if(lastRaw!==null&&lastRaw-raw>302400)weekOffset+=604800;
+      point.time=String(raw+weekOffset);
+      lastRaw=raw;
+    }
+  }
   if(!points.length)throw Error('No valid GNSS track points found in CSV.');
   return points;
 }
