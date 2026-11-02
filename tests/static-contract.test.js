@@ -367,6 +367,7 @@ test('FlySight 2 metadata identifies matching track and sensor sessions and devi
 
   assert.equal(tm.sessionId,sm.metadata.sessionId);
   assert.equal(validatePair(tm,sm),true);
+  assert.match(ui,/if\(!trackMetadata\)trackMetadata=trackDraft\?\.trackMetadata;if\(!sensorData&&trackDraft\?\.sensorData\)sensorData=trackDraft\.sensorData;validateFlySightPair\(trackMetadata,sensorData\)/);
   assert.equal(tm.deviceId,sm.metadata.deviceId);
   assert.equal(tm.firmwareVersion,'v2024.05.25.pairing_request');
   assert.equal(sm.sensors.IMU.samples,1);
