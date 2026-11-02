@@ -205,10 +205,16 @@ window.setCloudSnapshot=x=>{if(!x||!Array.isArray(x.jumps)||!Array.isArray(x.obj
   </section>
 </div>
 <script type="module">
-import { createInternalNeonAuth } from 'https://esm.sh/@neondatabase/auth';
 const AUTH_URL='https://ep-young-truth-badvxgct.neonauth.c-8.eu-central-1.aws.neon.tech/neondb/auth';
-const neonAuth=createInternalNeonAuth(AUTH_URL);
-const auth=neonAuth.adapter;
+let neonAuth=null;
+try {
+  const authModule=await import('https://esm.sh/@neondatabase/auth');
+  neonAuth=authModule.createInternalNeonAuth(AUTH_URL);
+} catch(error) {
+  // The app shell must remain usable when the CDN is unreachable offline.
+  console.info('Neon Auth SDK unavailable; starting in local-only mode.',error);
+}
+const auth=neonAuth?.adapter||null;
 const gate=document.getElementById('authGate'), errorBox=document.getElementById('authError'), submit=document.getElementById('authSubmit'), toggle=document.getElementById('authToggle'), status=document.getElementById('authStatus');
 let creating=false, cloudReady=false, cloudConflict=false, syncBusy=false, syncAgain=false, bearer=null, cloudUpdatedAt=null, syncRetryTimer=null, syncRetryAttempt=0;
 function showError(e){errorBox.textContent=e?.message||String(e)||'Authentication failed.'}
@@ -356,12 +362,26 @@ window.cloudSync=()=>{if(cloudReady)syncCloud()};
 window.addEventListener('online',()=>{if(syncRetryTimer){clearTimeout(syncRetryTimer);syncRetryTimer=null}if(cloudReady)syncCloud()});
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&cloudReady){if(syncRetryTimer){clearTimeout(syncRetryTimer);syncRetryTimer=null}syncCloud()}});
 window.signOutLogbook=async()=>{try{await auth.signOut();cloudReady=false;cloudConflict=false;syncAgain=false;bearer=null;cloudUpdatedAt=null;if(syncRetryTimer){clearTimeout(syncRetryTimer);syncRetryTimer=null}syncRetryAttempt=0;gate.style.display='flex';status.textContent='Signed out';errorBox.textContent='';}catch(e){showError(e)}};
+function enterOfflineMode(){
+  cloudReady=false;cloudConflict=false;bearer=null;cloudUpdatedAt=null;
+  gate.style.display='none';
+  status.textContent='Offline mode · records stay on this device until secure cloud sync is available.';
+  render();
+}
 async function enterApp(){
-  const session=await auth.getSession();
-  if(!session?.data?.user&&!session?.user)throw Error('No active session.');
+  if(!auth){enterOfflineMode();return}
+  let session;
+  try{session=await auth.getSession()}catch(error){if(navigator.onLine===false){enterOfflineMode();return}throw error}
+  if(!session?.data?.user&&!session?.user){if(navigator.onLine===false){enterOfflineMode();return}throw Error('No active session.')}
   bearer=await getToken();
-  await api('/api/me');
-  const cloud=await api('/api/snapshot');
+  let cloud;
+  try{
+    await api('/api/me');
+    cloud=await api('/api/snapshot');
+  }catch(error){
+    if(navigator.onLine===false||!error.status||error.status>=500){enterOfflineMode();return}
+    throw error;
+  }
   cloudUpdatedAt=cloud.updatedAt||null;
   if(cloud.snapshot){
     const local=window.getLocalSnapshot();
@@ -381,6 +401,7 @@ async function enterApp(){
   status.textContent='Cloud sync active · '+email;
 }
 submit.onclick=async()=>{
+  if(!auth){showError('Authentication is unavailable offline. Your local logbook remains accessible; reconnect and reload to sign in.');return}
   submit.disabled=true;errorBox.textContent='';
   try{
     const email=document.getElementById('authEmail').value.trim(),password=document.getElementById('authPassword').value,name=document.getElementById('authName').value.trim();
