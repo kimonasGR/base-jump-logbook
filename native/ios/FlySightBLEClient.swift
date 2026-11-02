@@ -35,9 +35,12 @@ final class FlySightBLEClient: NSObject, ObservableObject {
 
     struct FlySightFile: Identifiable, Equatable {
         let name: String
+        let path: String
         let size: UInt32
         let attributes: UInt8
-        var id: String { name }
+        var id: String { path }
+        /// FlySight uses the FAT directory attribute bit (0x10).
+        var isDirectory: Bool { attributes & 0x10 != 0 }
     }
 
     enum FileTransferError: LocalizedError {
@@ -80,6 +83,7 @@ final class FlySightBLEClient: NSObject, ObservableObject {
     private var pendingCommand: UInt8?
     private var commandCompletion: ((Result<Void, Error>) -> Void)?
     private var directoryEntries: [FlySightFile] = []
+    private var listingPath = "/"
     private var directoryCompletion: ((Result<[FlySightFile], Error>) -> Void)?
     private var downloadBuffer = Data()
     private var downloadExpectedSize: UInt32 = 0
@@ -128,6 +132,7 @@ final class FlySightBLEClient: NSObject, ObservableObject {
         guard deviceMode == 0 else { completion(.failure(FileTransferError.idleModeRequired)); return }
         guard let tx = characteristics[filePacketIn], characteristics[filePacketOut] != nil else { completion(.failure(FileTransferError.missingCharacteristic)); return }
         directoryEntries = []
+        listingPath = path.hasPrefix("/") ? path : "/" + path
         directoryCompletion = completion
         beginTimeout()
         beginKeepAlive()
@@ -257,7 +262,9 @@ final class FlySightBLEClient: NSObject, ObservableObject {
             if name.isEmpty { finishDirectory(.success(directoryEntries)); return }
             let size = data.subdata(in: 2..<6).withUnsafeBytes { $0.loadUnaligned(as: UInt32.self).littleEndian }
             let attributes = data[10]
-            directoryEntries.append(FlySightFile(name: name, size: size, attributes: attributes))
+            let parent = listingPath == "/" ? "" : listingPath.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+            let fullPath = parent.isEmpty ? "/" + name : "/" + parent + "/" + name
+            directoryEntries.append(FlySightFile(name: name, path: fullPath, size: size, attributes: attributes))
         case 0x10:
             guard data.count >= 2, downloadCompletion != nil else { return }
             let counter = data[1]
