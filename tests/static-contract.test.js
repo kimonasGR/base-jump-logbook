@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
+import { runInNewContext } from 'node:vm';
 
 const server = await readFile(new URL('../src/server.js', import.meta.url), 'utf8');
 const ui = await readFile(new URL('../public/index.html', import.meta.url), 'utf8');
@@ -638,4 +639,64 @@ test('offline PWA falls back to the local logbook when the Auth CDN or API is un
   assert.match(ui, /if\(!auth\)\{enterOfflineMode\(\);return\}/);
   assert.match(ui, /Offline mode · records stay on this device/);
   assert.match(ui, /navigator\.onLine===false\|\|!error\.status\|\|error\.status>=500/);
+});
+
+
+test('service worker runtime caches the shell, preserves unrelated caches and serves offline navigation', async () => {
+  const source = await readFile(new URL('../public/sw.js', import.meta.url), 'utf8');
+  const listeners = {};
+  const entries = new Map();
+  const deleted = [];
+  const cache = {
+    async addAll(paths) { for (const path of paths) entries.set(path, new Response('shell:' + path)); },
+    async put(key, response) { entries.set(typeof key === 'string' ? key : key.url, response); },
+    async match(key) { return entries.get(typeof key === 'string' ? key : key.url) || null; }
+  };
+  const caches = {
+    async open() { return cache; },
+    async match(key) { return cache.match(key); },
+    async keys() { return ['base-logbook-shell-old', 'unrelated-app-cache']; },
+    async delete(key) { deleted.push(key); return true; }
+  };
+  const self = {
+    location: { origin: 'https://logbook.test' },
+    clients: { async claim() {} },
+    async skipWaiting() {},
+    addEventListener(type, listener) { listeners[type] = listener; }
+  };
+  runInNewContext(source, {
+    self, caches, URL, Response,
+    fetch: async () => { throw new Error('network offline'); }
+  });
+
+  let installTask;
+  listeners.install({ waitUntil(task) { installTask = task; } });
+  await installTask;
+  assert.deepEqual([...entries.keys()].sort(), ['/', '/icons/base-logbook.svg', '/index.html', '/manifest.webmanifest'].sort());
+
+  let activateTask;
+  listeners.activate({ waitUntil(task) { activateTask = task; } });
+  await activateTask;
+  assert.deepEqual(deleted, ['base-logbook-shell-old']);
+
+  let intercepted = false;
+  listeners.fetch({
+    request: { method: 'GET', url: 'https://logbook.test/api/health', mode: 'cors', destination: '' },
+    respondWith() { intercepted = true; }
+  });
+  assert.equal(intercepted, false, 'API requests must bypass the app-shell cache');
+
+  listeners.fetch({
+    request: { method: 'POST', url: 'https://logbook.test/jumps', mode: 'cors', destination: '' },
+    respondWith() { intercepted = true; }
+  });
+  assert.equal(intercepted, false, 'non-GET requests must bypass the app-shell cache');
+
+  let navigationResponse;
+  listeners.fetch({
+    request: { method: 'GET', url: 'https://logbook.test/', mode: 'navigate', destination: 'document' },
+    respondWith(task) { navigationResponse = task; }
+  });
+  const response = await navigationResponse;
+  assert.equal(await response.text(), 'shell:/');
 });
