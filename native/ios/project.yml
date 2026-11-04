@@ -9,6 +9,7 @@ targets:
     platform: iOS
     sources:
       - path: FlySightLogbookApp.swift
+      - path: WebLogbookView.swift
       - path: FlySightConnectionView.swift
       - path: FlySightBLEClient.swift
     info:
