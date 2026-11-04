@@ -147,6 +147,37 @@ private struct LogbookWebView: UIViewRepresentable {
             }
         }
 
+        @available(iOS 15.0, *)
+        func webView(
+            _ webView: WKWebView,
+            requestMediaCapturePermissionFor origin: WKSecurityOrigin,
+            initiatedByFrame frame: WKFrameInfo,
+            type: WKMediaCaptureType,
+            decisionHandler: @escaping (WKPermissionDecision) -> Void
+        ) {
+            // Voice notes use microphone capture. Camera capture is not
+            // currently required by the logbook.
+            if origin.host == "base-jump-logbook.vercel.app", type == .microphone {
+                decisionHandler(.grant)
+            } else {
+                decisionHandler(.deny)
+            }
+        }
+
+        @available(iOS 15.2, *)
+        func webView(
+            _ webView: WKWebView,
+            requestGeolocationPermissionFor origin: WKSecurityOrigin,
+            initiatedByFrame frame: WKFrameInfo,
+            decisionHandler: @escaping (WKPermissionDecision) -> Void
+        ) {
+            if origin.host == "base-jump-logbook.vercel.app" {
+                decisionHandler(.prompt)
+            } else {
+                decisionHandler(.deny)
+            }
+        }
+
         func webView(
             _ webView: WKWebView,
             runJavaScriptAlertPanelWithMessage message: String,
