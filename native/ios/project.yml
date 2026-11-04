@@ -13,6 +13,7 @@ targets:
       - path: FlySightConnectionView.swift
       - path: FlySightBLEClient.swift
     info:
+      path: Info.plist
       properties:
         UIBackgroundModes:
           - bluetooth-central
