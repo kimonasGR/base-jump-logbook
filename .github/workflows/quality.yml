@@ -39,7 +39,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: base-jump-logbook-ios-simulator
-          path: native/ios/build/Build/Products/Debug-iphonesimulator/BASEJumpLogbook.app
+          path: native/ios/build/Build/Products/Debug-iphonesimulator/BASE Jump Logbook.app
           if-no-files-found: error
           retention-days: 7
 
