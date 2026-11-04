@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>NSBluetoothAlwaysUsageDescription</key>
+    <string>Connect to your FlySight 2 to import jump tracks and sensor measurements.</string>
+    <key>NSMicrophoneUsageDescription</key>
+    <string>Record voice notes and jump details for your BASE Logbook.</string>
+    <key>NSLocationWhenInUseUsageDescription</key>
+    <string>Add the current GPS coordinates to a jump record when you request them.</string>
+    <key>UIBackgroundModes</key>
+    <array>
+        <string>bluetooth-central</string>
+    </array>
+</dict>
+</plist>
