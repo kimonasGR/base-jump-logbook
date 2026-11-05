@@ -24,10 +24,12 @@ struct FlySightConnectionView: View {
                         Spacer()
                         Text(statusText).foregroundStyle(.secondary)
                     }
-                    Button("Scan for FlySight 2") { bluetooth.startScan() }
-                        .disabled(bluetooth.state == .scanning || bluetooth.state == .poweredOff || bluetooth.state == .unavailable)
                     if bluetooth.state == .scanning {
-                        HStack { ProgressView(); Text("Searching for nearby FlySight devices…") }
+                        Button("Stop scanning", role: .cancel) { bluetooth.stopScan() }
+                        HStack { ProgressView(); Text("Searching for nearby FlySight devices… (up to 20 seconds)") }
+                    } else {
+                        Button("Scan for FlySight 2") { bluetooth.startScan() }
+                            .disabled(bluetooth.state == .poweredOff || bluetooth.state == .unavailable)
                     }
                     Text("Unplug the FlySight from USB, switch it on, then double-press its button. Connect while the green LED is pulsing (about 30 seconds).")
                         .font(.footnote).foregroundStyle(.secondary)
