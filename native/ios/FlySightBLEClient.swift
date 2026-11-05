@@ -91,6 +91,7 @@ final class FlySightBLEClient: NSObject, ObservableObject {
     private var downloadPath: String?
     private var transferTimeout: Task<Void, Never>?
     private var keepAliveTask: Task<Void, Never>?
+    private var scanTimeoutTask: Task<Void, Never>?
     private var expectedDownloadCounter: UInt8 = 0
     private var recentlyAcknowledgedCounters: [UInt8] = []
     private let maximumImportFileSize = 15 * 1024 * 1024
@@ -102,14 +103,28 @@ final class FlySightBLEClient: NSObject, ObservableObject {
 
     func startScan() {
         guard central.state == .poweredOn else { return }
+        scanTimeoutTask?.cancel()
         discoveredDevices = []
         state = .scanning
         // FlySight 2 advertises its manufacturer ID (0x09DB); its custom
         // services are discovered after connection, not necessarily advertised.
         central.scanForPeripherals(withServices: nil, options: [CBCentralManagerScanOptionAllowDuplicatesKey: false])
+        // Bound scanning to avoid leaving Bluetooth discovery active indefinitely.
+        scanTimeoutTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: 20_000_000_000)
+            guard !Task.isCancelled, let self, self.state == .scanning else { return }
+            self.central.stopScan()
+            self.state = .disconnected("No FlySight 2 found. Try scanning again.")
+            self.scanTimeoutTask = nil
+        }
     }
 
-    func stopScan() { central.stopScan() }
+    func stopScan() {
+        scanTimeoutTask?.cancel()
+        scanTimeoutTask = nil
+        central.stopScan()
+        if state == .scanning { state = .disconnected("Scan stopped.") }
+    }
 
     func connect(to peripheral: CBPeripheral) {
         stopScan()
@@ -356,6 +371,10 @@ final class FlySightBLEClient: NSObject, ObservableObject {
 
 extension FlySightBLEClient: CBCentralManagerDelegate {
     func centralManagerDidUpdateState(_ central: CBCentralManager) {
+        if central.state != .poweredOn {
+            scanTimeoutTask?.cancel()
+            scanTimeoutTask = nil
+        }
         switch central.state {
         case .poweredOn: state = .disconnected("Bluetooth ready")
         case .poweredOff: state = .poweredOff
