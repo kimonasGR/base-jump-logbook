@@ -627,11 +627,12 @@ test('PWA manifest declares a standalone mobile app with a valid icon', async ()
   assert.equal(manifest.display, 'standalone');
   assert.equal(manifest.start_url, '/');
   assert.ok(manifest.icons.some(icon => icon.src === '/icons/base-logbook.svg'));
+  assert.ok(manifest.icons.some(icon => icon.src === '/icons/base-logbook-apple.png' && icon.sizes === '180x180' && icon.type === 'image/png'));
 });
 
 test('service worker caches only the app shell and never intercepts API requests', async () => {
   const sw = await readFile(new URL('../public/sw.js', import.meta.url), 'utf8');
-  assert.match(sw, /base-logbook-shell-v1/);
+  assert.match(sw, /base-logbook-shell-v\\d+/);
   assert.match(sw, /url\.pathname\.startsWith\('\/api\/'\)/);
   assert.match(sw, /request\.mode === 'navigate'/);
   assert.match(sw, /caches\.match\('\/'\)/);
@@ -639,6 +640,7 @@ test('service worker caches only the app shell and never intercepts API requests
 
 test('mobile app metadata and secure service worker registration are present', () => {
   assert.match(ui, /apple-mobile-web-app-capable/);
+  assert.match(ui, /rel=\"apple-touch-icon\" sizes=\"180x180\" href=\"\\/icons\\/base-logbook-apple\\.png\"/);
   assert.match(ui, /rel="manifest" href="\/manifest\.webmanifest"/);
   assert.match(ui, /navigator\.serviceWorker\.register\('\/sw\.js'/);
   assert.match(ui, /location\.protocol === 'https:'/);
@@ -828,7 +830,7 @@ test('service worker runtime caches the shell, preserves unrelated caches and se
   let installTask;
   listeners.install({ waitUntil(task) { installTask = task; } });
   await installTask;
-  assert.deepEqual([...entries.keys()].sort(), ['/', '/icons/base-logbook.svg', '/index.html', '/manifest.webmanifest'].sort());
+  assert.deepEqual([...entries.keys()].sort(), ['/', '/icons/base-logbook.svg', '/icons/base-logbook-apple.png', '/index.html', '/manifest.webmanifest'].sort());
 
   let activateTask;
   listeners.activate({ waitUntil(task) { activateTask = task; } });
