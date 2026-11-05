@@ -766,6 +766,14 @@ test('FlySight can cancel directory reads and disconnect without leaving callbac
   assert.match(nativeFlySight, /bluetooth\.state == \.pairingRequired/);
 });
 
+test('FlySight ignores stale connection callbacks and cleans telemetry after connection failures', () => {
+  assert.match(nativeFlySightBLE, /didConnect peripheral: CBPeripheral[\s\S]*guard self\.peripheral === peripheral else \{[\s\S]*cancelPeripheralConnection\(peripheral\)/);
+  assert.match(nativeFlySightBLE, /didFailToConnect peripheral: CBPeripheral[\s\S]*stopTransferTimers\(\)[\s\S]*pendingBLEWrites\.removeAll[\s\S]*self\.peripheral = nil[\s\S]*deviceMode = nil[\s\S]*latestGNSS = nil/);
+  assert.match(nativeFlySightBLE, /didDiscoverServices error: Error\?[\s\S]*guard self\.peripheral === peripheral else \{ return \}[\s\S]*Could not discover FlySight services/);
+  assert.match(nativeFlySightBLE, /didDiscoverCharacteristicsFor service: CBService, error: Error\?[\s\S]*guard self\.peripheral === peripheral else \{ return \}[\s\S]*Could not discover FlySight characteristics/);
+  assert.match(nativeFlySightBLE, /didDisconnectPeripheral peripheral: CBPeripheral[\s\S]*deviceMode = nil[\s\S]*batteryPercent = nil[\s\S]*latestGNSS = nil/);
+});
+
 
 test('offline PWA falls back to the local logbook when the Auth CDN or API is unavailable', () => {
   assert.match(ui, /let neonAuth=null/);

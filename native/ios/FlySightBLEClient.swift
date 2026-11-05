@@ -459,14 +459,25 @@ extension FlySightBLEClient: CBCentralManagerDelegate {
     }
 
     func centralManager(_ central: CBCentralManager, didConnect peripheral: CBPeripheral) {
+        // A delayed callback from an earlier connection attempt must not replace
+        // the device currently selected by the user.
+        guard self.peripheral === peripheral else {
+            central.cancelPeripheralConnection(peripheral)
+            return
+        }
         state = .connected
         peripheral.discoverServices([fileService, sensorService, stateService, batteryService])
     }
 
     func centralManager(_ central: CBCentralManager, didFailToConnect peripheral: CBPeripheral, error: Error?) {
         guard self.peripheral === peripheral else { return }
-        self.peripheral = nil
+        stopTransferTimers()
+        pendingBLEWrites.removeAll(keepingCapacity: false)
         characteristics.removeAll()
+        self.peripheral = nil
+        deviceMode = nil
+        batteryPercent = nil
+        latestGNSS = nil
         state = .disconnected(error?.localizedDescription ?? "Connection failed")
     }
 
@@ -476,8 +487,12 @@ extension FlySightBLEClient: CBCentralManagerDelegate {
         self.peripheral = nil
         characteristics.removeAll()
         pendingBLEWrites.removeAll(keepingCapacity: false)
+        stopTransferTimers()
         if directoryCompletion != nil { finishDirectory(.failure(FileTransferError.cancelled)) }
         if downloadCompletion != nil { finishTransfer(.failure(FileTransferError.cancelled)) }
+        deviceMode = nil
+        batteryPercent = nil
+        latestGNSS = nil
         state = .disconnected(error?.localizedDescription ?? "Disconnected")
     }
 }
@@ -488,12 +503,26 @@ extension FlySightBLEClient: CBPeripheralDelegate {
     }
 
     func peripheral(_ peripheral: CBPeripheral, didDiscoverServices error: Error?) {
-        guard error == nil else { state = .disconnected(error!.localizedDescription); return }
+        guard self.peripheral === peripheral else { return }
+        if let error {
+            characteristics.removeAll()
+            self.peripheral = nil
+            state = .disconnected("Could not discover FlySight services: " + error.localizedDescription)
+            central.cancelPeripheralConnection(peripheral)
+            return
+        }
         discoverCharacteristics()
     }
 
     func peripheral(_ peripheral: CBPeripheral, didDiscoverCharacteristicsFor service: CBService, error: Error?) {
-        guard error == nil else { return }
+        guard self.peripheral === peripheral else { return }
+        if let error {
+            characteristics.removeAll()
+            self.peripheral = nil
+            state = .disconnected("Could not discover FlySight characteristics: " + error.localizedDescription)
+            central.cancelPeripheralConnection(peripheral)
+            return
+        }
         for characteristic in service.characteristics ?? [] {
             characteristics[characteristic.uuid] = characteristic
             if characteristic.uuid == filePacketIn {
