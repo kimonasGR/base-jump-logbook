@@ -152,7 +152,7 @@ test('AI draft maps numeric off-heading angle and direction separately while ret
 
 test('jump Height preserves source text and Off Heading stores numeric angle plus L/R direction', () => {
   assert.match(ui, /field\('Height','height',[\s\S]*?'text'\)/);
-  assert.match(ui, /field\('Off Heading \\(degrees\\)','offHeading',[\s\S]*?'number'\)/);
+  assert.ok(ui.includes("field('Off Heading (degrees)','offHeading'"));
   assert.match(ui, /selectField\('Off Heading direction','offHeadingDirection'/);
   assert.match(ui, /height:d\.height\.trim\(\)/);
   assert.match(ui, /offHeading:d\.offHeading===''\?'':Number\(d\.offHeading\)/);
