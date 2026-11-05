@@ -8,6 +8,7 @@ const ui = await readFile(new URL('../public/index.html', import.meta.url), 'utf
 const migration = await readFile(new URL('../migrations/001_initial.sql', import.meta.url), 'utf8');
 const flySightMigration = await readFile(new URL('../migrations/002_flysight_handoff.sql', import.meta.url), 'utf8');
 const mediaMigration = await readFile(new URL('../migrations/003_user_media.sql', import.meta.url), 'utf8');
+const offHeadingMigration = await readFile(new URL('../migrations/004_off_heading_angle.sql', import.meta.url), 'utf8');
 const nativeFlySight = await readFile(new URL('../native/ios/FlySightConnectionView.swift', import.meta.url), 'utf8');
 const nativeFlySightBLE = await readFile(new URL('../native/ios/FlySightBLEClient.swift', import.meta.url), 'utf8');
 const vercel = JSON.parse(await readFile(new URL('../vercel.json', import.meta.url), 'utf8'));
@@ -148,6 +149,12 @@ test('AI draft maps numeric off-heading angle and direction separately while ret
   assert.match(ui, /value\?'Yes':'No'/);
   assert.match(ui, /opening_direction_degrees==='number'/);
   assert.match(ui, /new Option\(String\(display\),String\(display\)\)/);
+});
+
+test('off-heading migration stores angle and L/R direction without inventing legacy values', () => {
+  assert.match(offHeadingMigration,/ALTER COLUMN off_heading TYPE DOUBLE PRECISION USING NULL::DOUBLE PRECISION/);
+  assert.match(offHeadingMigration,/ADD COLUMN IF NOT EXISTS off_heading_direction TEXT CHECK/);
+  assert.match(server,/off_heading: z\.number\(\)\.min\(0\)\.max\(360\)/);
 });
 
 test('jump Height preserves source text and Off Heading stores numeric angle plus L/R direction', () => {
