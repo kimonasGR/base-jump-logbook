@@ -486,6 +486,11 @@ test('native FlySight uploader pins HTTPS handoff tokens to the trusted logbook 
   assert.match(nativeFlySight, /TRACK\.CSV.*SENSOR\.CSV.*TRACK\.GPX/);
 });
 
+test('FlySight token setup instructions do not ask users to configure an API URL', () => {
+  assert.match(ui, /Token created\. Copy it into the FlySight tab of the iPhone app; the secure destination is already configured\./);
+  assert.doesNotMatch(ui, /Enter your deployed API URL/);
+});
+
 test('web logbook can create a handoff token and load verified uploaded chunks into the existing importer', () => {
   assert.match(ui, /createFlySightHandoff/);
   assert.match(ui, /\/api\/flysight\/handoffs/);
