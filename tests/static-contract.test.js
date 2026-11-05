@@ -632,7 +632,7 @@ test('PWA manifest declares a standalone mobile app with a valid icon', async ()
 
 test('service worker caches only the app shell and never intercepts API requests', async () => {
   const sw = await readFile(new URL('../public/sw.js', import.meta.url), 'utf8');
-  assert.match(sw, /base-logbook-shell-v\\d+/);
+  assert.match(sw, /base-logbook-shell-v\d+/);
   assert.match(sw, /url\.pathname\.startsWith\('\/api\/'\)/);
   assert.match(sw, /request\.mode === 'navigate'/);
   assert.match(sw, /caches\.match\('\/'\)/);
