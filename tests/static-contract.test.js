@@ -640,7 +640,7 @@ test('service worker caches only the app shell and never intercepts API requests
 
 test('mobile app metadata and secure service worker registration are present', () => {
   assert.match(ui, /apple-mobile-web-app-capable/);
-  assert.match(ui, /rel=\"apple-touch-icon\" sizes=\"180x180\" href=\"\\/icons\\/base-logbook-apple\\.png\"/);
+  assert.ok(ui.includes('rel="apple-touch-icon" sizes="180x180" href="/icons/base-logbook-apple.png"'));
   assert.match(ui, /rel="manifest" href="\/manifest\.webmanifest"/);
   assert.match(ui, /navigator\.serviceWorker\.register\('\/sw\.js'/);
   assert.match(ui, /location\.protocol === 'https:'/);
