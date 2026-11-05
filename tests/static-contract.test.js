@@ -467,8 +467,10 @@ test('FlySight handoff uploads lock and revalidate the token row before enforcin
   assert.match(server, /if\(!lockedSession\.rowCount\)[\s\S]*Handoff token is invalid or expired/);
 });
 
-test('native FlySight uploader uses HTTPS, bounded chunks and the scoped handoff token', () => {
-  assert.match(nativeFlySight, /scheme == "https"/);
+test('native FlySight uploader pins HTTPS handoff tokens to the trusted logbook origin', () => {
+  assert.match(nativeFlySight, /scheme\?\.lowercased\(\) == "https"/);
+  assert.match(nativeFlySight, /host\?\.lowercased\(\) == "base-jump-logbook\.vercel\.app"/);
+  assert.doesNotMatch(nativeFlySight, /TextField\("Logbook address"/);
   assert.match(nativeFlySight, /256 \* 1024/);
   assert.match(nativeFlySight, /15 \* 1024 \* 1024/);
   assert.match(nativeFlySight, /X-FlySight-Handoff/);
