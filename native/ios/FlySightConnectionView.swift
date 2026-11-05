@@ -14,6 +14,7 @@ struct FlySightConnectionView: View {
     @State private var handoffToken = ""
     @State private var uploadStatus = ""
     @State private var isUploading = false
+    @State private var uploadTask: Task<Void, Never>?
 
     var body: some View {
         NavigationStack {
@@ -141,13 +142,17 @@ struct FlySightConnectionView: View {
                     SecureField("10-minute handoff token", text: $handoffToken)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
-                    Button {
-                        Task { await uploadSelectedFiles() }
-                    } label: {
-                        if isUploading { ProgressView(uploadStatus.isEmpty ? "Uploading…" : uploadStatus) }
-                        else { Label("Upload selected FlySight files", systemImage: "lock.shield") }
+                    if isUploading {
+                        Button("Cancel upload", role: .destructive) { uploadTask?.cancel() }
+                        ProgressView(uploadStatus.isEmpty ? "Uploading…" : uploadStatus)
+                    } else {
+                        Button {
+                            uploadTask = Task { await uploadSelectedFiles() }
+                        } label: {
+                            Label("Upload selected FlySight files", systemImage: "lock.shield")
+                        }
+                        .disabled(selectedForImport.isEmpty || handoffToken.trimmingCharacters(in: .whitespacesAndNewlines).count != 64)
                     }
-                    .disabled(isUploading || selectedForImport.isEmpty || handoffToken.trimmingCharacters(in: .whitespacesAndNewlines).count != 64)
                     if !uploadStatus.isEmpty {
                         Text(uploadStatus).font(.footnote).foregroundStyle(.secondary)
                     }
@@ -235,6 +240,7 @@ struct FlySightConnectionView: View {
         defer { isUploading = false }
         do {
             for fileURL in selected {
+                try Task.checkCancellation()
                 let name = fileURL.lastPathComponent.uppercased()
                 guard ["TRACK.CSV", "SENSOR.CSV", "TRACK.GPX"].contains(name) else {
                     throw UploadError.message("Unsupported file: \(name)")
@@ -247,6 +253,7 @@ struct FlySightConnectionView: View {
                 let chunkSize = 256 * 1024
                 let totalChunks = (data.count + chunkSize - 1) / chunkSize
                 for index in 0..<totalChunks {
+                    try Task.checkCancellation()
                     let start = index * chunkSize
                     let end = min(start + chunkSize, data.count)
                     let chunk = data.subdata(in: start..<end)
@@ -271,7 +278,10 @@ struct FlySightConnectionView: View {
                 }
                 uploadStatus = "\(name) uploaded and integrity-checked."
             }
+            try Task.checkCancellation()
             uploadStatus = "Upload complete. Open the logbook import inbox to add the files to a jump draft."
+        } catch is CancellationError {
+            uploadStatus = "Upload cancelled. Files already received remain in the temporary inbox until token expiry."
         } catch {
             uploadStatus = error.localizedDescription
         }
