@@ -1,0 +1,2 @@
+ALTER TABLE jumps ALTER COLUMN off_heading TYPE DOUBLE PRECISION USING NULL::DOUBLE PRECISION;
+ALTER TABLE jumps ADD COLUMN IF NOT EXISTS off_heading_direction TEXT CHECK (off_heading_direction IN ('L','R'));
