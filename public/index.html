@@ -276,13 +276,13 @@ async function startVoiceAll(){
    try{
     const result=await window.extractVoiceAudio(blob);
     const draft=result.draft||{};
-    const map={object_name:'objectName',country:'country',latitude:'latitude',longitude:'longitude',height_m:'height',object_type:'objectType',object_type_other:'otherType',date_time:'',slider_configuration:'sliderConfiguration',pilot_chute:'pilotChute',suit:'suit',summit_osp:'summitOsp',rig:'rig',jump_type:'jumpType',wind_strength:'windStrength',wind_direction:'windDirection',delay_seconds:'delay',delay_for_su_seconds:'delaySu',exit_manoeuvre:'exitManoeuvre',off_heading:'offHeading',correction:'correction',brake_setting:'brakeSetting',beautiful_people_around:'beautifulPeople',private_notes:'privateNotes',deployment_method:'deploymentMethod',opening_direction_degrees:'openingDirection'};
+    const map={object_name:'objectName',country:'country',latitude:'latitude',longitude:'longitude',height_m:'height',object_type:'objectType',object_type_other:'otherType',date_time:'',slider_configuration:'sliderConfiguration',pilot_chute:'pilotChute',suit:'suit',summit_osp:'summitOsp',rig:'rig',jump_type:'jumpType',wind_strength:'windStrength',wind_direction:'windDirection',delay_seconds:'delay',delay_for_su_seconds:'delaySu',exit_manoeuvre:'exitManoeuvre',off_heading:'offHeading',off_heading_direction:'offHeadingDirection',correction:'correction',brake_setting:'brakeSetting',beautiful_people_around:'beautifulPeople',private_notes:'privateNotes',deployment_method:'deploymentMethod',opening_direction_degrees:'openingDirection'};
     const uncertain=[];
     for(const [key,name] of Object.entries(map)){
      const value=draft[key]; if(!name||value===null||value===undefined||value==='')continue;
      const el=f.elements[name];if(!el)continue;
      let display=value;
-     if(key==='off_heading'||key==='correction')display=value?'Yes':'No';
+     if(key==='correction')display=value?'Yes':'No';
      if(el.tagName==='SELECT'&&![...el.options].some(o=>o.value===String(display)))el.add(new Option(String(display),String(display)));
      el.value=String(display);
     }
