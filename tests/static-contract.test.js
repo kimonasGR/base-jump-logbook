@@ -807,3 +807,12 @@ test('service worker runtime caches the shell, preserves unrelated caches and se
   const response = await navigationResponse;
   assert.equal(await response.text(), 'shell:/');
 });
+
+test('native FlySight discovery scan stops after a bounded interval and can be cancelled manually', () => {
+  assert.match(nativeFlySight, /scanTimeoutTask/);
+  assert.match(nativeFlySight, /20_000_000_000/);
+  assert.match(nativeFlySight, /No FlySight 2 found/);
+  assert.match(nativeFlySight, /func stopScan\(\)[\s\S]*scanTimeoutTask\?\.cancel\(\)/);
+  assert.match(nativeFlySight, /if central\.state != \.poweredOn[\s\S]*scanTimeoutTask\?\.cancel\(\)/);
+  assert.match(nativeFlySightView, /Stop scanning/);
+});
