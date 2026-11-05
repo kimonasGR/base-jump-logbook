@@ -35,6 +35,17 @@ jobs:
       - name: Build iOS Simulator app
         working-directory: native/ios
         run: xcodebuild -project BASEJumpLogbook.xcodeproj -scheme BASEJumpLogbook -sdk iphonesimulator -configuration Debug -destination 'generic/platform=iOS Simulator' -derivedDataPath build CODE_SIGNING_ALLOWED=NO build
+      - name: Launch app in iOS Simulator
+        working-directory: native/ios
+        run: |
+          set -euo pipefail
+          APP_PATH="$PWD/build/Build/Products/Debug-iphonesimulator/BASE Jump Logbook.app"
+          DEVICE_ID="$(xcrun simctl list devices available | awk -F '[()]' '/iPhone/ { print $2; exit }')"
+          test -n "$DEVICE_ID"
+          xcrun simctl boot "$DEVICE_ID" || true
+          xcrun simctl bootstatus "$DEVICE_ID" -b
+          xcrun simctl install "$DEVICE_ID" "$APP_PATH"
+          xcrun simctl launch "$DEVICE_ID" com.kimonasgr.basejumplogbook
       - name: Upload simulator build
         uses: actions/upload-artifact@v4
         with:
