@@ -573,6 +573,13 @@ test('AI import preview validates row limits, dates, numeric and off-heading ang
 });
 
 
+test('pre-mapped JSON logbooks use the authenticated application preview without AI rewriting', () => {
+  assert.match(server, /if \(ext==='json'\) \{[\s\S]*draft=JSON\.parse\(content\)/);
+  assert.match(server, /directImport:true/);
+  assert.match(ui, /Choose logbook file/);
+  assert.match(ui, /Add jumps to my logbook/);
+});
+
 test('AI logbook import uses bounded ExcelJS parsing and extracts searchable PDFs server-side', () => {
   assert.ok(server.includes("import ExcelJS from 'exceljs'"));
   assert.doesNotMatch(server, /from 'xlsx'/);
