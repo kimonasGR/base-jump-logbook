@@ -27,7 +27,7 @@ Based on the FlySight 2 firmware BLE developer documentation:
 7. Treat `0xf0` as command rejection and `0xf1` as command acknowledgement. The prototype also applies a 30-second transfer timeout and supports `0xff` cancellation.
 8. Save downloaded files in the app's Documents directory. The native screen lets the user select `TRACK.CSV` and `SENSOR.CSV` together and share both files in one share-sheet action. The user then selects both in the web logbook's existing multi-file import control. The source files on the FlySight are never modified or deleted.
 
-The protocol documentation specifies Go-Back-N with a window of eight packets and 242-byte frames. The client tracks sequential receive counters, re-acknowledges duplicates still inside an eight-packet receive window without appending them twice, leaves future/out-of-window packets unacknowledged, and sends a 15-second keep-alive. Directory completion and failure now stop both transfer timers. This is not yet a proven full Go-Back-N implementation: counter wrap, older duplicates, retransmission timing, negotiated MTU edge cases, and long-transfer reliability still require validation against hardware and firmware.
+The protocol documentation specifies Go-Back-N with a window of eight packets and 242-byte frames. The client tracks sequential receive counters, re-acknowledges duplicates still inside an eight-packet receive window without appending them twice, leaves future/out-of-window packets unacknowledged, and sends a 15-second keep-alive. Directory completion and failure now stop both transfer timers and discard stale queued writes. Directory reads and file transfers can be cancelled from the UI; manual disconnect terminates the active operation immediately, clears pending frames, and ignores late disconnect callbacks from peripherals that are no longer active. Bluetooth power loss also fails active operations immediately. Outbound BLE writes are queued in order when CoreBluetooth reports backpressure, drained through `peripheralIsReady(toSendWriteWithoutResponse:)`, and capped at 128 pending frames; queue overflow aborts the operation rather than silently dropping an ACK or command. This reduces host-side write loss but does not prove end-to-end delivery. This is not yet a proven full Go-Back-N implementation: counter wrap, older duplicates, retransmission timing, negotiated MTU edge cases, and long-transfer reliability still require validation against hardware and firmware.
 
 ## Planned import workflow
 
@@ -35,13 +35,13 @@ The protocol documentation specifies Go-Back-N with a window of eight packets an
 2. User switches the FlySight to Idle mode (LED off).
 3. App lists the device directory. The user browses the date and session folders, then selects `TRACK.CSV` and optionally `SENSOR.CSV` from the same session.
 4. App downloads the files into matching local date/session folders without modifying or deleting the originals.
-5. In the signed-in web logbook, create a one-time FlySight token from Settings. In the iOS app, paste the token (the production API URL is pre-filled) and upload the selected files over HTTPS in 256 KiB chunks. The server verifies the declared SHA-256 before making files visible to the same account.
+5. In the signed-in web logbook, create a one-time FlySight token from Settings. In the iOS app, paste the token and upload the selected files over HTTPS in 256 KiB chunks. The destination is fixed to the trusted production HTTPS origin; users cannot redirect upload tokens to another server. The server verifies the declared SHA-256 before making files visible to the same account.
 6. In the web logbook, open a new jump and use **Load FlySight inbox**. The browser downloads and independently verifies every chunk, passes the source files into the existing TRACK/SENSOR import parser, and shows the track and sensor summary for review. The user saves the jump only after checking the draft.
 7. Delete the temporary inbox handoff from the jump form after import; the saved jump retains its imported track data and source-file fingerprints.
 
 ## Known gaps before release
 
-- Configure Apple signing/team and install the generated app on a physical iPhone.
+- Configure Apple signing/team and install the generated app on a physical iPhone. CI now also compiles an unsigned `iphoneos` Release build, but that does not replace code signing or on-device installation.
 - Validate secure pairing, device discovery, directory attribute flags, mode values and packet offsets on actual iPhone/FlySight hardware.
 - Validate Go-Back-N retransmission/window handling, counter wrap, MTU negotiation and interrupted/large downloads on hardware. The current implementation is bounded and duplicate-aware, but is not yet a proven full Go-Back-N implementation.
 - Validate the complete upload → inbox → browser verification → import-review workflow using a signed-in account.

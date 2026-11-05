@@ -44,7 +44,7 @@ final class FlySightBLEClient: NSObject, ObservableObject {
     }
 
     enum FileTransferError: LocalizedError {
-        case notConnected, idleModeRequired, missingCharacteristic, malformedPacket, deviceRejected(UInt8), timedOut, cancelled, transferInProgress, fileTooLarge, sizeMismatch
+        case notConnected, idleModeRequired, missingCharacteristic, malformedPacket, deviceRejected(UInt8), timedOut, cancelled, transferInProgress, fileTooLarge, sizeMismatch, writeQueueFull
         var errorDescription: String? {
             switch self {
             case .notConnected: return "Connect to FlySight 2 first."
@@ -57,6 +57,7 @@ final class FlySightBLEClient: NSObject, ObservableObject {
             case .transferInProgress: return "Another FlySight file operation is already in progress."
             case .fileTooLarge: return "This file exceeds the 15 MB import limit."
             case .sizeMismatch: return "Downloaded file size does not match the directory listing."
+            case .writeQueueFull: return "Bluetooth is not accepting writes quickly enough. The transfer was stopped to avoid losing data."
             }
         }
     }
@@ -80,6 +81,12 @@ final class FlySightBLEClient: NSObject, ObservableObject {
     private var central: CBCentralManager!
     private var peripheral: CBPeripheral?
     private var characteristics: [CBUUID: CBCharacteristic] = [:]
+    private struct PendingBLEWrite {
+        let data: Data
+        let characteristic: CBCharacteristic
+    }
+    private var pendingBLEWrites: [PendingBLEWrite] = []
+    private let maximumPendingBLEWrites = 128
     private var pendingCommand: UInt8?
     private var commandCompletion: ((Result<Void, Error>) -> Void)?
     private var directoryEntries: [FlySightFile] = []
@@ -91,6 +98,7 @@ final class FlySightBLEClient: NSObject, ObservableObject {
     private var downloadPath: String?
     private var transferTimeout: Task<Void, Never>?
     private var keepAliveTask: Task<Void, Never>?
+    private var scanTimeoutTask: Task<Void, Never>?
     private var expectedDownloadCounter: UInt8 = 0
     private var recentlyAcknowledgedCounters: [UInt8] = []
     private let maximumImportFileSize = 15 * 1024 * 1024
@@ -102,16 +110,32 @@ final class FlySightBLEClient: NSObject, ObservableObject {
 
     func startScan() {
         guard central.state == .poweredOn else { return }
+        scanTimeoutTask?.cancel()
         discoveredDevices = []
         state = .scanning
         // FlySight 2 advertises its manufacturer ID (0x09DB); its custom
         // services are discovered after connection, not necessarily advertised.
         central.scanForPeripherals(withServices: nil, options: [CBCentralManagerScanOptionAllowDuplicatesKey: false])
+        // Bound scanning to avoid leaving Bluetooth discovery active indefinitely.
+        scanTimeoutTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: 20_000_000_000)
+            guard !Task.isCancelled, let self, self.state == .scanning else { return }
+            self.central.stopScan()
+            self.state = .disconnected("No FlySight 2 found. Try scanning again.")
+            self.scanTimeoutTask = nil
+        }
     }
 
-    func stopScan() { central.stopScan() }
+    func stopScan() {
+        scanTimeoutTask?.cancel()
+        scanTimeoutTask = nil
+        central.stopScan()
+        if state == .scanning { state = .disconnected("Scan stopped.") }
+    }
 
     func connect(to peripheral: CBPeripheral) {
+        guard self.peripheral?.state != .connected,
+              state != .connecting else { return }
         stopScan()
         self.peripheral = peripheral
         peripheral.delegate = self
@@ -121,6 +145,14 @@ final class FlySightBLEClient: NSObject, ObservableObject {
 
     func disconnect() {
         guard let peripheral else { return }
+        pendingBLEWrites.removeAll(keepingCapacity: false)
+        stopTransferTimers()
+        if directoryCompletion != nil {
+            finishDirectory(.failure(FileTransferError.cancelled))
+        } else if downloadCompletion != nil {
+            finishTransfer(.failure(FileTransferError.cancelled))
+        }
+        state = .disconnected("Disconnecting…")
         central.cancelPeripheralConnection(peripheral)
     }
 
@@ -159,13 +191,15 @@ final class FlySightBLEClient: NSObject, ObservableObject {
         command.append(contentsOf: [UInt8](repeating: 0, count: 8))
         command.append(contentsOf: path.utf8)
         command.append(0)
-        peripheral?.writeValue(command, for: tx, type: .withoutResponse)
+        enqueueWrite(command, characteristic: tx)
     }
 
-    func cancelFileTransfer() {
+    func cancelOperation() {
         guard let tx = characteristics[filePacketIn], transferIsActive else { return }
-        peripheral?.writeValue(Data([0xff]), for: tx, type: .withoutResponse)
-        finishTransfer(.failure(FileTransferError.cancelled))
+        // Discard stale data/keep-alive frames before placing the cancel command.
+        pendingBLEWrites.removeAll(keepingCapacity: false)
+        enqueueWrite(Data([0xff]), characteristic: tx)
+        finishTransfer(.failure(FileTransferError.cancelled), preservePendingWrites: true)
     }
 
     private var transferIsActive: Bool { directoryCompletion != nil || downloadCompletion != nil || commandCompletion != nil }
@@ -174,7 +208,35 @@ final class FlySightBLEClient: NSObject, ObservableObject {
         var packet = Data([opcode])
         packet.append(contentsOf: path.utf8)
         packet.append(0)
-        peripheral?.writeValue(packet, for: characteristic, type: .withoutResponse)
+        enqueueWrite(packet, characteristic: characteristic)
+    }
+
+    /// CoreBluetooth applies backpressure to writes without response. Keep protocol
+    /// frames ordered and drain them only when the peripheral reports capacity.
+    private func enqueueWrite(_ data: Data, characteristic: CBCharacteristic) {
+        guard let peripheral, peripheral.state == .connected else { return }
+        if pendingBLEWrites.isEmpty && peripheral.canSendWriteWithoutResponse {
+            peripheral.writeValue(data, for: characteristic, type: .withoutResponse)
+            return
+        }
+        guard pendingBLEWrites.count < maximumPendingBLEWrites else {
+            pendingBLEWrites.removeAll(keepingCapacity: false)
+            if directoryCompletion != nil {
+                finishDirectory(.failure(FileTransferError.writeQueueFull))
+            } else if transferIsActive {
+                finishTransfer(.failure(FileTransferError.writeQueueFull))
+            }
+            return
+        }
+        pendingBLEWrites.append(PendingBLEWrite(data: data, characteristic: characteristic))
+    }
+
+    private func flushPendingWrites(for peripheral: CBPeripheral) {
+        guard self.peripheral === peripheral else { return }
+        while peripheral.canSendWriteWithoutResponse && !pendingBLEWrites.isEmpty {
+            let next = pendingBLEWrites.removeFirst()
+            peripheral.writeValue(next.data, for: next.characteristic, type: .withoutResponse)
+        }
     }
 
     private func beginKeepAlive() {
@@ -190,7 +252,7 @@ final class FlySightBLEClient: NSObject, ObservableObject {
 
     private func sendKeepAlive() {
         guard transferIsActive, let tx = characteristics[filePacketIn], peripheral != nil else { return }
-        peripheral?.writeValue(Data([0xfe]), for: tx, type: .withoutResponse)
+        enqueueWrite(Data([0xfe]), characteristic: tx)
     }
 
     private func stopTransferTimers() {
@@ -209,8 +271,14 @@ final class FlySightBLEClient: NSObject, ObservableObject {
         }
     }
 
-    private func finishTransfer(_ result: Result<Data, Error>) {
+    private func finishTransfer(_ result: Result<Data, Error>, preservePendingWrites: Bool = false) {
         stopTransferTimers()
+        // On failure, queued frames belong to the expired operation and must
+        // never leak into a later transfer. On EOF/cancel, retain protocol
+        // ACK/cancel frames until CoreBluetooth has capacity to send them.
+        if !preservePendingWrites {
+            pendingBLEWrites.removeAll(keepingCapacity: false)
+        }
         if let completion = downloadCompletion {
             let completedPath = downloadPath ?? "file"
             downloadCompletion = nil
@@ -230,6 +298,9 @@ final class FlySightBLEClient: NSObject, ObservableObject {
 
     private func finishDirectory(_ result: Result<[FlySightFile], Error>) {
         stopTransferTimers()
+        // Directory listings have no final data ACK to preserve. Drop queued
+        // commands/keep-alives so they cannot run during a later file operation.
+        pendingBLEWrites.removeAll(keepingCapacity: false)
         let completion = directoryCompletion
         directoryCompletion = nil
         if case .success(let files) = result { transferStatus = "Found \(files.count) files" }
@@ -270,7 +341,7 @@ final class FlySightBLEClient: NSObject, ObservableObject {
                 // Re-acknowledge any duplicate still inside the receive window.
                 // Never append duplicate payload bytes to the downloaded file.
                 if let tx = characteristics[filePacketIn] {
-                    peripheral?.writeValue(Data([0x12, counter]), for: tx, type: .withoutResponse)
+                    enqueueWrite(Data([0x12, counter]), characteristic: tx)
                 }
                 return
             }
@@ -280,7 +351,7 @@ final class FlySightBLEClient: NSObject, ObservableObject {
                 return
             }
             if let tx = characteristics[filePacketIn] {
-                peripheral?.writeValue(Data([0x12, counter]), for: tx, type: .withoutResponse)
+                enqueueWrite(Data([0x12, counter]), characteristic: tx)
             }
             recentlyAcknowledgedCounters.append(counter)
             if recentlyAcknowledgedCounters.count > 8 {
@@ -292,7 +363,7 @@ final class FlySightBLEClient: NSObject, ObservableObject {
                 if downloadExpectedSize > 0 && UInt32(result.count) != downloadExpectedSize {
                     finishTransfer(.failure(FileTransferError.sizeMismatch))
                 } else {
-                    finishTransfer(.success(result))
+                    finishTransfer(.success(result), preservePendingWrites: true)
                 }
                 return
             }
@@ -356,6 +427,16 @@ final class FlySightBLEClient: NSObject, ObservableObject {
 
 extension FlySightBLEClient: CBCentralManagerDelegate {
     func centralManagerDidUpdateState(_ central: CBCentralManager) {
+        if central.state != .poweredOn {
+            scanTimeoutTask?.cancel()
+            scanTimeoutTask = nil
+            pendingBLEWrites.removeAll(keepingCapacity: false)
+            if directoryCompletion != nil {
+                finishDirectory(.failure(FileTransferError.notConnected))
+            } else if downloadCompletion != nil {
+                finishTransfer(.failure(FileTransferError.notConnected))
+            }
+        }
         switch central.state {
         case .poweredOn: state = .disconnected("Bluetooth ready")
         case .poweredOff: state = .poweredOff
@@ -378,30 +459,70 @@ extension FlySightBLEClient: CBCentralManagerDelegate {
     }
 
     func centralManager(_ central: CBCentralManager, didConnect peripheral: CBPeripheral) {
+        // A delayed callback from an earlier connection attempt must not replace
+        // the device currently selected by the user.
+        guard self.peripheral === peripheral else {
+            central.cancelPeripheralConnection(peripheral)
+            return
+        }
         state = .connected
         peripheral.discoverServices([fileService, sensorService, stateService, batteryService])
     }
 
     func centralManager(_ central: CBCentralManager, didFailToConnect peripheral: CBPeripheral, error: Error?) {
+        guard self.peripheral === peripheral else { return }
+        stopTransferTimers()
+        pendingBLEWrites.removeAll(keepingCapacity: false)
+        characteristics.removeAll()
+        self.peripheral = nil
+        deviceMode = nil
+        batteryPercent = nil
+        latestGNSS = nil
         state = .disconnected(error?.localizedDescription ?? "Connection failed")
     }
 
     func centralManager(_ central: CBCentralManager, didDisconnectPeripheral peripheral: CBPeripheral, error: Error?) {
+        // Ignore late callbacks from a peripheral that is no longer active.
+        guard self.peripheral === peripheral else { return }
+        self.peripheral = nil
         characteristics.removeAll()
+        pendingBLEWrites.removeAll(keepingCapacity: false)
+        stopTransferTimers()
         if directoryCompletion != nil { finishDirectory(.failure(FileTransferError.cancelled)) }
         if downloadCompletion != nil { finishTransfer(.failure(FileTransferError.cancelled)) }
+        deviceMode = nil
+        batteryPercent = nil
+        latestGNSS = nil
         state = .disconnected(error?.localizedDescription ?? "Disconnected")
     }
 }
 
 extension FlySightBLEClient: CBPeripheralDelegate {
+    func peripheralIsReady(toSendWriteWithoutResponse peripheral: CBPeripheral) {
+        flushPendingWrites(for: peripheral)
+    }
+
     func peripheral(_ peripheral: CBPeripheral, didDiscoverServices error: Error?) {
-        guard error == nil else { state = .disconnected(error!.localizedDescription); return }
+        guard self.peripheral === peripheral else { return }
+        if let error {
+            characteristics.removeAll()
+            self.peripheral = nil
+            state = .disconnected("Could not discover FlySight services: " + error.localizedDescription)
+            central.cancelPeripheralConnection(peripheral)
+            return
+        }
         discoverCharacteristics()
     }
 
     func peripheral(_ peripheral: CBPeripheral, didDiscoverCharacteristicsFor service: CBService, error: Error?) {
-        guard error == nil else { return }
+        guard self.peripheral === peripheral else { return }
+        if let error {
+            characteristics.removeAll()
+            self.peripheral = nil
+            state = .disconnected("Could not discover FlySight characteristics: " + error.localizedDescription)
+            central.cancelPeripheralConnection(peripheral)
+            return
+        }
         for characteristic in service.characteristics ?? [] {
             characteristics[characteristic.uuid] = characteristic
             if characteristic.uuid == filePacketIn {

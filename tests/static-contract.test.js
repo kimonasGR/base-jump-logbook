@@ -467,13 +467,28 @@ test('FlySight handoff uploads lock and revalidate the token row before enforcin
   assert.match(server, /if\(!lockedSession\.rowCount\)[\s\S]*Handoff token is invalid or expired/);
 });
 
-test('native FlySight uploader uses HTTPS, bounded chunks and the scoped handoff token', () => {
-  assert.match(nativeFlySight, /scheme == "https"/);
+test('FlySight checksum failures commit chunk cleanup so a corrected upload can be retried', () => {
+  const start=server.indexOf("app.post('/api/flysight/handoffs/upload'");
+  const end=server.indexOf("app.get('/api/flysight/handoffs', requireUser",start);
+  const handler=server.slice(start,end);
+  assert.match(handler, /if\(actual!==v\.sha256\.toLowerCase\(\)\)\{[\s\S]*DELETE FROM flysight_handoff_chunks[\s\S]*COMMIT[\s\S]*Retry the upload/);
+  assert.doesNotMatch(handler, /DELETE FROM flysight_handoff_chunks[^;]*;await client\.query\('ROLLBACK'\)/);
+});
+
+test('native FlySight uploader pins HTTPS handoff tokens to the trusted logbook origin', () => {
+  assert.match(nativeFlySight, /scheme\?\.lowercased\(\) == "https"/);
+  assert.match(nativeFlySight, /host\?\.lowercased\(\) == "base-jump-logbook\.vercel\.app"/);
+  assert.doesNotMatch(nativeFlySight, /TextField\("Logbook address"/);
   assert.match(nativeFlySight, /256 \* 1024/);
   assert.match(nativeFlySight, /15 \* 1024 \* 1024/);
   assert.match(nativeFlySight, /X-FlySight-Handoff/);
   assert.match(nativeFlySight, /SHA256\.hash\(data: data\)/);
   assert.match(nativeFlySight, /TRACK\.CSV.*SENSOR\.CSV.*TRACK\.GPX/);
+});
+
+test('FlySight token setup instructions do not ask users to configure an API URL', () => {
+  assert.match(ui, /Token created\. Copy it into the FlySight tab of the iPhone app; the secure destination is already configured\./);
+  assert.doesNotMatch(ui, /Enter your deployed API URL/);
 });
 
 test('web logbook can create a handoff token and load verified uploaded chunks into the existing importer', () => {
@@ -730,10 +745,46 @@ test('FlySight receive path re-acknowledges duplicates within its eight-packet w
   assert.match(nativeFlySightBLE, /guard counter == expectedDownloadCounter/);
 });
 
+test('FlySight BLE transfer cleanup drops stale writes but preserves final ACK and cancel frames', () => {
+  const finish = nativeFlySightBLE.match(/private func finishTransfer\(_ result: Result<Data, Error>, preservePendingWrites: Bool = false\) \{([\s\S]*?)\n    \}/)?.[1] || '';
+  assert.match(finish, /if !preservePendingWrites/);
+  assert.match(finish, /pendingBLEWrites\.removeAll\(keepingCapacity: false\)/);
+  assert.match(nativeFlySightBLE, /finishTransfer\(\.success\(result\), preservePendingWrites: true\)/);
+  assert.match(nativeFlySightBLE, /finishTransfer\(\.failure\(FileTransferError\.cancelled\), preservePendingWrites: true\)/);
+  assert.match(nativeFlySightBLE, /pendingBLEWrites\.removeAll\(keepingCapacity: false\)\s*enqueueWrite\(Data\(\[0xff\]\)/);
+});
+
 test('FlySight directory completion always stops timeout and keep-alive tasks', () => {
   const completion = nativeFlySightBLE.match(/private func finishDirectory\(_ result: Result<\[FlySightFile\], Error>\) \{([\s\S]*?)\n    \}/)?.[1] || '';
   assert.match(completion, /stopTransferTimers\(\)/);
   assert.match(completion, /directoryCompletion = nil/);
+});
+
+test('FlySight directory completion clears queued writes and Bluetooth loss fails active operations immediately', () => {
+  const completion = nativeFlySightBLE.match(/private func finishDirectory\(_ result: Result<\[FlySightFile\], Error>\) \{([\s\S]*?)\n    \}/)?.[1] || '';
+  assert.match(completion, /pendingBLEWrites\.removeAll\(keepingCapacity: false\)/);
+  const stateHandler = nativeFlySightBLE.match(/func centralManagerDidUpdateState\(_ central: CBCentralManager\) \{([\s\S]*?)\n    \}/)?.[1] || '';
+  assert.match(stateHandler, /if central\.state != \.poweredOn[\s\S]*pendingBLEWrites\.removeAll/);
+  assert.match(stateHandler, /finishDirectory\(\.failure\(FileTransferError\.notConnected\)\)/);
+  assert.match(stateHandler, /finishTransfer\(\.failure\(FileTransferError\.notConnected\)\)/);
+});
+
+test('FlySight can cancel directory reads and disconnect without leaving callbacks or stale peripheral state', () => {
+  assert.match(nativeFlySightBLE, /func cancelOperation\(\)/);
+  assert.match(nativeFlySightBLE, /func disconnect\(\)[\s\S]*stopTransferTimers\(\)[\s\S]*finishDirectory\(\.failure\(FileTransferError\.cancelled\)\)/);
+  assert.match(nativeFlySightBLE, /state = \.disconnected\("Disconnecting…"\)[\s\S]*central\.cancelPeripheralConnection\(peripheral\)/);
+  assert.match(nativeFlySightBLE, /didDisconnectPeripheral peripheral: CBPeripheral[\s\S]*guard self\.peripheral === peripheral else \{ return \}[\s\S]*self\.peripheral = nil/);
+  assert.match(nativeFlySight, /Cancel directory read/);
+  assert.match(nativeFlySight, /bluetooth\.cancelOperation\(\)/);
+  assert.match(nativeFlySight, /bluetooth\.state == \.pairingRequired/);
+});
+
+test('FlySight ignores stale connection callbacks and cleans telemetry after connection failures', () => {
+  assert.match(nativeFlySightBLE, /didConnect peripheral: CBPeripheral[\s\S]*guard self\.peripheral === peripheral else \{[\s\S]*cancelPeripheralConnection\(peripheral\)/);
+  assert.match(nativeFlySightBLE, /didFailToConnect peripheral: CBPeripheral[\s\S]*stopTransferTimers\(\)[\s\S]*pendingBLEWrites\.removeAll[\s\S]*self\.peripheral = nil[\s\S]*deviceMode = nil[\s\S]*latestGNSS = nil/);
+  assert.match(nativeFlySightBLE, /didDiscoverServices error: Error\?[\s\S]*guard self\.peripheral === peripheral else \{ return \}[\s\S]*Could not discover FlySight services/);
+  assert.match(nativeFlySightBLE, /didDiscoverCharacteristicsFor service: CBService, error: Error\?[\s\S]*guard self\.peripheral === peripheral else \{ return \}[\s\S]*Could not discover FlySight characteristics/);
+  assert.match(nativeFlySightBLE, /didDisconnectPeripheral peripheral: CBPeripheral[\s\S]*deviceMode = nil[\s\S]*batteryPercent = nil[\s\S]*latestGNSS = nil/);
 });
 
 
@@ -804,4 +855,32 @@ test('service worker runtime caches the shell, preserves unrelated caches and se
   });
   const response = await navigationResponse;
   assert.equal(await response.text(), 'shell:/');
+});
+
+test('native FlySight discovery scan stops after a bounded interval and can be cancelled manually', () => {
+  assert.match(nativeFlySightBLE, /scanTimeoutTask/);
+  assert.match(nativeFlySightBLE, /20_000_000_000/);
+  assert.match(nativeFlySightBLE, /No FlySight 2 found/);
+  assert.match(nativeFlySightBLE, /func stopScan\(\)[\s\S]*scanTimeoutTask\?\.cancel\(\)/);
+  assert.match(nativeFlySightBLE, /if central\.state != \.poweredOn[\s\S]*scanTimeoutTask\?\.cancel\(\)/);
+  assert.match(nativeFlySight, /Stop scanning/);
+});
+
+ 
+test('iPhone personal-use installation instructions explain free Safari home-screen app and BLE limitation', () => {
+  assert.match(ui, /Install on your iPhone · Free/);
+  assert.match(ui, /Add to Home Screen/);
+  assert.match(ui, /manual TRACK\.CSV \/ SENSOR\.CSV import/);
+  assert.match(ui, /Direct Bluetooth connection to FlySight 2 requires the separate native iOS app/);
+});
+
+test('FlySight BLE writes respect CoreBluetooth backpressure and preserve queued frame order', () => {
+  assert.match(nativeFlySightBLE, /private var pendingBLEWrites: \[PendingBLEWrite\] = \[\]/);
+  assert.match(nativeFlySightBLE, /peripheral\.canSendWriteWithoutResponse/);
+  assert.match(nativeFlySightBLE, /peripheralIsReady\(toSendWriteWithoutResponse peripheral: CBPeripheral\)/);
+  assert.match(nativeFlySightBLE, /flushPendingWrites\(for: peripheral\)/);
+  assert.match(nativeFlySightBLE, /maximumPendingBLEWrites = 128/);
+  assert.match(nativeFlySightBLE, /writeQueueFull/);
+  assert.match(nativeFlySightBLE, /pendingBLEWrites\.removeAll\(keepingCapacity: false\)/);
+  assert.equal(nativeFlySightBLE.split('type: .withoutResponse').length - 1, 2);
 });

@@ -10,7 +10,7 @@ struct FlySightConnectionView: View {
     @State private var isListing = false
     @State private var downloadingName: String?
     @State private var transferSaveError: String?
-    @State private var apiBaseURL = "https://base-jump-logbook.vercel.app"
+    private let apiBaseURL = URL(string: "https://base-jump-logbook.vercel.app")!
     @State private var handoffToken = ""
     @State private var uploadStatus = ""
     @State private var isUploading = false
@@ -24,10 +24,12 @@ struct FlySightConnectionView: View {
                         Spacer()
                         Text(statusText).foregroundStyle(.secondary)
                     }
-                    Button("Scan for FlySight 2") { bluetooth.startScan() }
-                        .disabled(bluetooth.state == .scanning || bluetooth.state == .poweredOff || bluetooth.state == .unavailable)
                     if bluetooth.state == .scanning {
-                        HStack { ProgressView(); Text("Searching for nearby FlySight devices…") }
+                        Button("Stop scanning", role: .cancel) { bluetooth.stopScan() }
+                        HStack { ProgressView(); Text("Searching for nearby FlySight devices… (up to 20 seconds)") }
+                    } else {
+                        Button("Scan for FlySight 2") { bluetooth.startScan() }
+                            .disabled(bluetooth.state == .poweredOff || bluetooth.state == .unavailable)
                     }
                     Text("Unplug the FlySight from USB, switch it on, then double-press its button. Connect while the green LED is pulsing (about 30 seconds).")
                         .font(.footnote).foregroundStyle(.secondary)
@@ -50,6 +52,7 @@ struct FlySightConnectionView: View {
                                     }
                                 }
                             }
+                            .disabled(bluetooth.state == .connected || bluetooth.state == .connecting || bluetooth.state == .pairingRequired)
                         }
                     }
                 }
@@ -119,7 +122,9 @@ struct FlySightConnectionView: View {
                     }
                     if downloadingName != nil {
                         ProgressView(value: bluetooth.transferProgress)
-                        Button("Cancel transfer", role: .destructive) { bluetooth.cancelFileTransfer(); downloadingName = nil }
+                        Button("Cancel transfer", role: .destructive) { bluetooth.cancelOperation(); downloadingName = nil }
+                    } else if isListing {
+                        Button("Cancel directory read", role: .destructive) { bluetooth.cancelOperation() }
                     }
                     if !bluetooth.transferStatus.isEmpty {
                         Text(bluetooth.transferStatus).font(.footnote).foregroundStyle(.secondary)
@@ -130,10 +135,9 @@ struct FlySightConnectionView: View {
                 }
 
                 Section("Secure upload to your logbook") {
-                    TextField("Logbook address", text: $apiBaseURL)
-                        .textInputAutocapitalization(.never)
-                        .keyboardType(.URL)
-                        .autocorrectionDisabled()
+                    Label("Destination: base-jump-logbook.vercel.app", systemImage: "lock.shield")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
                     SecureField("10-minute handoff token", text: $handoffToken)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
@@ -143,7 +147,7 @@ struct FlySightConnectionView: View {
                         if isUploading { ProgressView(uploadStatus.isEmpty ? "Uploading…" : uploadStatus) }
                         else { Label("Upload selected FlySight files", systemImage: "lock.shield") }
                     }
-                    .disabled(isUploading || selectedForImport.isEmpty || apiBaseURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || handoffToken.trimmingCharacters(in: .whitespacesAndNewlines).count != 64)
+                    .disabled(isUploading || selectedForImport.isEmpty || handoffToken.trimmingCharacters(in: .whitespacesAndNewlines).count != 64)
                     if !uploadStatus.isEmpty {
                         Text(uploadStatus).font(.footnote).foregroundStyle(.secondary)
                     }
@@ -199,10 +203,12 @@ struct FlySightConnectionView: View {
 
 
     private func uploadSelectedFiles() async {
-        guard let base = URL(string: apiBaseURL.trimmingCharacters(in: .whitespacesAndNewlines)),
-              let scheme = base.scheme?.lowercased(), scheme == "https",
-              base.host != nil else {
-            uploadStatus = "Enter the HTTPS address of your deployed logbook API."
+        let base = apiBaseURL
+        guard base.scheme?.lowercased() == "https",
+              base.host?.lowercased() == "base-jump-logbook.vercel.app",
+              base.user == nil, base.password == nil, base.port == nil,
+              base.path.isEmpty || base.path == "/" else {
+            uploadStatus = "The upload destination is not trusted."
             return
         }
         let token = handoffToken.trimmingCharacters(in: .whitespacesAndNewlines)
