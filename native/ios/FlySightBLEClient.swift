@@ -288,6 +288,9 @@ final class FlySightBLEClient: NSObject, ObservableObject {
 
     private func finishDirectory(_ result: Result<[FlySightFile], Error>) {
         stopTransferTimers()
+        // Directory listings have no final data ACK to preserve. Drop queued
+        // commands/keep-alives so they cannot run during a later file operation.
+        pendingBLEWrites.removeAll(keepingCapacity: false)
         let completion = directoryCompletion
         directoryCompletion = nil
         if case .success(let files) = result { transferStatus = "Found \(files.count) files" }
@@ -417,6 +420,12 @@ extension FlySightBLEClient: CBCentralManagerDelegate {
         if central.state != .poweredOn {
             scanTimeoutTask?.cancel()
             scanTimeoutTask = nil
+            pendingBLEWrites.removeAll(keepingCapacity: false)
+            if directoryCompletion != nil {
+                finishDirectory(.failure(FileTransferError.notConnected))
+            } else if downloadCompletion != nil {
+                finishTransfer(.failure(FileTransferError.notConnected))
+            }
         }
         switch central.state {
         case .poweredOn: state = .disconnected("Bluetooth ready")

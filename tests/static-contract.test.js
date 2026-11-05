@@ -747,6 +747,15 @@ test('FlySight directory completion always stops timeout and keep-alive tasks', 
   assert.match(completion, /directoryCompletion = nil/);
 });
 
+test('FlySight directory completion clears queued writes and Bluetooth loss fails active operations immediately', () => {
+  const completion = nativeFlySightBLE.match(/private func finishDirectory\(_ result: Result<\[FlySightFile\], Error>\) \{([\s\S]*?)\n    \}/)?.[1] || '';
+  assert.match(completion, /pendingBLEWrites\.removeAll\(keepingCapacity: false\)/);
+  const stateHandler = nativeFlySightBLE.match(/func centralManagerDidUpdateState\(_ central: CBCentralManager\) \{([\s\S]*?)\n    \}/)?.[1] || '';
+  assert.match(stateHandler, /if central\.state != \.poweredOn[\s\S]*pendingBLEWrites\.removeAll/);
+  assert.match(stateHandler, /finishDirectory\(\.failure\(FileTransferError\.notConnected\)\)/);
+  assert.match(stateHandler, /finishTransfer\(\.failure\(FileTransferError\.notConnected\)\)/);
+});
+
 
 test('offline PWA falls back to the local logbook when the Auth CDN or API is unavailable', () => {
   assert.match(ui, /let neonAuth=null/);
