@@ -186,7 +186,6 @@ function validateXlsxZip(bytes) {
   if(offset!==directoryOffset+directorySize) throw new Error('Invalid XLSX archive directory size');
 }
 app.post('/api/logbook/import-analyze', requireUser, asyncRoute(async (req,res) => {
-  if (!process.env.OPENAI_API_KEY) return res.status(503).json({error:'AI logbook import is not configured. Set OPENAI_API_KEY on the server.'});
   const fileName=String(req.body?.fileName||'logbook').slice(0,160);
   const ext=fileName.toLowerCase().split('.').pop();
   const binary=typeof req.body?.fileBase64==='string'?req.body.fileBase64:'';
@@ -232,6 +231,16 @@ app.post('/api/logbook/import-analyze', requireUser, asyncRoute(async (req,res) 
   }
   if (!content.trim() && !scannedPdfBase64) return res.status(400).json({error:'The selected file is empty or unreadable.'});
   if (Buffer.byteLength(content,'utf8')>600000) return res.status(413).json({error:'Extracted text is larger than 600 KB. Split the logbook into smaller files.'});
+  if (ext==='json') {
+    let draft;
+    try { draft=JSON.parse(content); } catch { return res.status(422).json({error:'The JSON import file is not valid JSON.'}); }
+    if (!draft || !Array.isArray(draft.jumps)) return res.status(422).json({error:'A direct JSON import must contain a jumps array.'});
+    if (draft.jumps.length>10000) return res.status(413).json({error:'A maximum of 10,000 jumps can be imported at once.'});
+    draft.mappingSummary=Array.isArray(draft.mappingSummary)?draft.mappingSummary.slice(0,100).map(x=>String(x).slice(0,1000)):['Pre-mapped JSON · fields will be reviewed in the application before import.'];
+    draft.warnings=Array.isArray(draft.warnings)?draft.warnings.slice(0,100).map(x=>String(x).slice(0,1000)):[];
+    return res.json({draft,requiresConfirmation:true,storedFile:false,directImport:true});
+  }
+  if (!process.env.OPENAI_API_KEY) return res.status(503).json({error:'AI logbook import is not configured. Set OPENAI_API_KEY on the server.'});
   const instructions = `You are converting an existing BASE jumping logbook into a draft for another BASE jump logbook app. Source filename: ${fileName}.
 Read the supplied source data, infer column/header meaning from names and sample values, and map records to the destination fields below. Return JSON only with shape {"jumps":[...],"mappingSummary":[...],"warnings":[...]}.
 Each jump may contain: number, objectName, country, date, time, height (preserve source text exactly; it may contain explanatory text), heightUnit ("m" or "ft"), objectType ("B","A","S","E","Other"), otherType, latitude, longitude, sliderConfiguration, pilotChute, suit, summitOsp, rig, jumpType, exitManoeuvre, deploymentMethod, windStrength, windDirection, delay, delaySu, openingAltitude, openingAltitudeLoss, openingDirection, offHeading (numeric angle in degrees only), offHeadingDirection ("L" or "R"), correction, brakeSetting, skyCover, lighting, privateNotes, beautifulPeople, uncertainFields.
