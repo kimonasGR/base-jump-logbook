@@ -152,6 +152,7 @@ final class FlySightBLEClient: NSObject, ObservableObject {
         } else if downloadCompletion != nil {
             finishTransfer(.failure(FileTransferError.cancelled))
         }
+        state = .disconnected("Disconnecting…")
         central.cancelPeripheralConnection(peripheral)
     }
 

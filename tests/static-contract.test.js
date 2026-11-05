@@ -759,6 +759,7 @@ test('FlySight directory completion clears queued writes and Bluetooth loss fail
 test('FlySight can cancel directory reads and disconnect without leaving callbacks or stale peripheral state', () => {
   assert.match(nativeFlySightBLE, /func cancelOperation\(\)/);
   assert.match(nativeFlySightBLE, /func disconnect\(\)[\s\S]*stopTransferTimers\(\)[\s\S]*finishDirectory\(\.failure\(FileTransferError\.cancelled\)\)/);
+  assert.match(nativeFlySightBLE, /state = \.disconnected\("Disconnecting…"\)[\s\S]*central\.cancelPeripheralConnection\(peripheral\)/);
   assert.match(nativeFlySightBLE, /didDisconnectPeripheral peripheral: CBPeripheral[\s\S]*guard self\.peripheral === peripheral else \{ return \}[\s\S]*self\.peripheral = nil/);
   assert.match(nativeFlySight, /Cancel directory read/);
   assert.match(nativeFlySight, /bluetooth\.cancelOperation\(\)/);
