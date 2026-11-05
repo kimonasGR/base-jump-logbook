@@ -1,4 +1,4 @@
-const CACHE_NAME = 'base-logbook-shell-v1';
+const CACHE_NAME = 'base-logbook-shell-v2';
 const APP_SHELL = ['/', '/index.html', '/manifest.webmanifest', '/icons/base-logbook.svg'];
 
 self.addEventListener('install', event => {
