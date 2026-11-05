@@ -756,6 +756,15 @@ test('FlySight directory completion clears queued writes and Bluetooth loss fail
   assert.match(stateHandler, /finishTransfer\(\.failure\(FileTransferError\.notConnected\)\)/);
 });
 
+test('FlySight can cancel directory reads and disconnect without leaving callbacks or stale peripheral state', () => {
+  assert.match(nativeFlySightBLE, /func cancelOperation\(\)/);
+  assert.match(nativeFlySightBLE, /func disconnect\(\)[\s\S]*stopTransferTimers\(\)[\s\S]*finishDirectory\(\.failure\(FileTransferError\.cancelled\)\)/);
+  assert.match(nativeFlySightBLE, /didDisconnectPeripheral peripheral: CBPeripheral[\s\S]*guard self\.peripheral === peripheral else \{ return \}[\s\S]*self\.peripheral = nil/);
+  assert.match(nativeFlySight, /Cancel directory read/);
+  assert.match(nativeFlySight, /bluetooth\.cancelOperation\(\)/);
+  assert.match(nativeFlySight, /bluetooth\.state == \.pairingRequired/);
+});
+
 
 test('offline PWA falls back to the local logbook when the Auth CDN or API is unavailable', () => {
   assert.match(ui, /let neonAuth=null/);

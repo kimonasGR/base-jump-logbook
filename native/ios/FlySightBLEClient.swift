@@ -134,6 +134,8 @@ final class FlySightBLEClient: NSObject, ObservableObject {
     }
 
     func connect(to peripheral: CBPeripheral) {
+        guard self.peripheral?.state != .connected,
+              state != .connecting else { return }
         stopScan()
         self.peripheral = peripheral
         peripheral.delegate = self
@@ -143,6 +145,13 @@ final class FlySightBLEClient: NSObject, ObservableObject {
 
     func disconnect() {
         guard let peripheral else { return }
+        pendingBLEWrites.removeAll(keepingCapacity: false)
+        stopTransferTimers()
+        if directoryCompletion != nil {
+            finishDirectory(.failure(FileTransferError.cancelled))
+        } else if downloadCompletion != nil {
+            finishTransfer(.failure(FileTransferError.cancelled))
+        }
         central.cancelPeripheralConnection(peripheral)
     }
 
@@ -184,7 +193,7 @@ final class FlySightBLEClient: NSObject, ObservableObject {
         enqueueWrite(command, characteristic: tx)
     }
 
-    func cancelFileTransfer() {
+    func cancelOperation() {
         guard let tx = characteristics[filePacketIn], transferIsActive else { return }
         // Discard stale data/keep-alive frames before placing the cancel command.
         pendingBLEWrites.removeAll(keepingCapacity: false)
@@ -454,10 +463,16 @@ extension FlySightBLEClient: CBCentralManagerDelegate {
     }
 
     func centralManager(_ central: CBCentralManager, didFailToConnect peripheral: CBPeripheral, error: Error?) {
+        guard self.peripheral === peripheral else { return }
+        self.peripheral = nil
+        characteristics.removeAll()
         state = .disconnected(error?.localizedDescription ?? "Connection failed")
     }
 
     func centralManager(_ central: CBCentralManager, didDisconnectPeripheral peripheral: CBPeripheral, error: Error?) {
+        // Ignore late callbacks from a peripheral that is no longer active.
+        guard self.peripheral === peripheral else { return }
+        self.peripheral = nil
         characteristics.removeAll()
         pendingBLEWrites.removeAll(keepingCapacity: false)
         if directoryCompletion != nil { finishDirectory(.failure(FileTransferError.cancelled)) }

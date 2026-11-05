@@ -52,6 +52,7 @@ struct FlySightConnectionView: View {
                                     }
                                 }
                             }
+                            .disabled(bluetooth.state == .connected || bluetooth.state == .connecting || bluetooth.state == .pairingRequired)
                         }
                     }
                 }
@@ -121,7 +122,9 @@ struct FlySightConnectionView: View {
                     }
                     if downloadingName != nil {
                         ProgressView(value: bluetooth.transferProgress)
-                        Button("Cancel transfer", role: .destructive) { bluetooth.cancelFileTransfer(); downloadingName = nil }
+                        Button("Cancel transfer", role: .destructive) { bluetooth.cancelOperation(); downloadingName = nil }
+                    } else if isListing {
+                        Button("Cancel directory read", role: .destructive) { bluetooth.cancelOperation() }
                     }
                     if !bluetooth.transferStatus.isEmpty {
                         Text(bluetooth.transferStatus).font(.footnote).foregroundStyle(.secondary)
