@@ -816,3 +816,15 @@ test('native FlySight discovery scan stops after a bounded interval and can be c
   assert.match(nativeFlySightBLE, /if central\.state != \.poweredOn[\s\S]*scanTimeoutTask\?\.cancel\(\)/);
   assert.match(nativeFlySight, /Stop scanning/);
 });
+
+ 
+test('FlySight BLE writes respect CoreBluetooth backpressure and preserve queued frame order', () => {
+  assert.match(nativeFlySightBLE, /private var pendingBLEWrites: \[PendingBLEWrite\] = \[\]/);
+  assert.match(nativeFlySightBLE, /peripheral\.canSendWriteWithoutResponse/);
+  assert.match(nativeFlySightBLE, /peripheralIsReady\(toSendWriteWithoutResponse peripheral: CBPeripheral\)/);
+  assert.match(nativeFlySightBLE, /flushPendingWrites\(for: peripheral\)/);
+  assert.match(nativeFlySightBLE, /maximumPendingBLEWrites = 128/);
+  assert.match(nativeFlySightBLE, /writeQueueFull/);
+  assert.match(nativeFlySightBLE, /pendingBLEWrites\.removeAll\(keepingCapacity: false\)/);
+  assert.equal(nativeFlySightBLE.split('type: .withoutResponse').length - 1, 2);
+});
