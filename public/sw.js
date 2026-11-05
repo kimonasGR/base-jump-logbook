@@ -1,5 +1,5 @@
-const CACHE_NAME = 'base-logbook-shell-v2';
-const APP_SHELL = ['/', '/index.html', '/manifest.webmanifest', '/icons/base-logbook.svg'];
+const CACHE_NAME = 'base-logbook-shell-v3';
+const APP_SHELL = ['/', '/index.html', '/manifest.webmanifest', '/icons/base-logbook.svg', '/icons/base-logbook-apple.png'];
 
 self.addEventListener('install', event => {
   event.waitUntil((async () => {
