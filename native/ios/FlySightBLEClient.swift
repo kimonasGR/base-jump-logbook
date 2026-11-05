@@ -186,8 +186,10 @@ final class FlySightBLEClient: NSObject, ObservableObject {
 
     func cancelFileTransfer() {
         guard let tx = characteristics[filePacketIn], transferIsActive else { return }
+        // Discard stale data/keep-alive frames before placing the cancel command.
+        pendingBLEWrites.removeAll(keepingCapacity: false)
         enqueueWrite(Data([0xff]), characteristic: tx)
-        finishTransfer(.failure(FileTransferError.cancelled))
+        finishTransfer(.failure(FileTransferError.cancelled), preservePendingWrites: true)
     }
 
     private var transferIsActive: Bool { directoryCompletion != nil || downloadCompletion != nil || commandCompletion != nil }
@@ -259,8 +261,14 @@ final class FlySightBLEClient: NSObject, ObservableObject {
         }
     }
 
-    private func finishTransfer(_ result: Result<Data, Error>) {
+    private func finishTransfer(_ result: Result<Data, Error>, preservePendingWrites: Bool = false) {
         stopTransferTimers()
+        // On failure, queued frames belong to the expired operation and must
+        // never leak into a later transfer. On EOF/cancel, retain protocol
+        // ACK/cancel frames until CoreBluetooth has capacity to send them.
+        if !preservePendingWrites {
+            pendingBLEWrites.removeAll(keepingCapacity: false)
+        }
         if let completion = downloadCompletion {
             let completedPath = downloadPath ?? "file"
             downloadCompletion = nil
@@ -342,7 +350,7 @@ final class FlySightBLEClient: NSObject, ObservableObject {
                 if downloadExpectedSize > 0 && UInt32(result.count) != downloadExpectedSize {
                     finishTransfer(.failure(FileTransferError.sizeMismatch))
                 } else {
-                    finishTransfer(.success(result))
+                    finishTransfer(.success(result), preservePendingWrites: true)
                 }
                 return
             }

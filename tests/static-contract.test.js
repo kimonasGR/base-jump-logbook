@@ -732,6 +732,15 @@ test('FlySight receive path re-acknowledges duplicates within its eight-packet w
   assert.match(nativeFlySightBLE, /guard counter == expectedDownloadCounter/);
 });
 
+test('FlySight BLE transfer cleanup drops stale writes but preserves final ACK and cancel frames', () => {
+  const finish = nativeFlySightBLE.match(/private func finishTransfer\(_ result: Result<Data, Error>, preservePendingWrites: Bool = false\) \{([\s\S]*?)\n    \}/)?.[1] || '';
+  assert.match(finish, /if !preservePendingWrites/);
+  assert.match(finish, /pendingBLEWrites\.removeAll\(keepingCapacity: false\)/);
+  assert.match(nativeFlySightBLE, /finishTransfer\(\.success\(result\), preservePendingWrites: true\)/);
+  assert.match(nativeFlySightBLE, /finishTransfer\(\.failure\(FileTransferError\.cancelled\), preservePendingWrites: true\)/);
+  assert.match(nativeFlySightBLE, /pendingBLEWrites\.removeAll\(keepingCapacity: false\)\s*enqueueWrite\(Data\(\[0xff\]\)/);
+});
+
 test('FlySight directory completion always stops timeout and keep-alive tasks', () => {
   const completion = nativeFlySightBLE.match(/private func finishDirectory\(_ result: Result<\[FlySightFile\], Error>\) \{([\s\S]*?)\n    \}/)?.[1] || '';
   assert.match(completion, /stopTransferTimers\(\)/);
