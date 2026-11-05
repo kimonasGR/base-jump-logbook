@@ -138,14 +138,26 @@ test('AI voice extraction maps to actual jump form field names', () => {
   assert.match(ui, /beautiful_people_around:'beautifulPeople'/);
   assert.match(ui, /deployment_method:'deploymentMethod'/);
   assert.match(ui, /opening_direction_degrees:'openingDirection'/);
+  assert.match(ui, /off_heading_direction:'offHeadingDirection'/);
   assert.match(ui, /id="voiceJumpForm"/);
 });
 
-test('AI draft converts boolean and opening-direction fields to UI option values', () => {
-  assert.match(ui, /key==='off_heading'\|\|key==='correction'/);
+test('AI draft maps numeric off-heading angle and direction separately while retaining boolean correction', () => {
+  assert.match(ui, /key==='correction'/);
+  assert.match(ui, /off_heading_direction:'offHeadingDirection'/);
   assert.match(ui, /value\?'Yes':'No'/);
   assert.match(ui, /opening_direction_degrees==='number'/);
   assert.match(ui, /new Option\(String\(display\),String\(display\)\)/);
+});
+
+test('jump Height preserves source text and Off Heading stores numeric angle plus L/R direction', () => {
+  assert.match(ui, /field\('Height','height',[\s\S]*?'text'\)/);
+  assert.match(ui, /field\('Off Heading \\(degrees\\)','offHeading',[\s\S]*?'number'\)/);
+  assert.match(ui, /selectField\('Off Heading direction','offHeadingDirection'/);
+  assert.match(ui, /height:d\.height\.trim\(\)/);
+  assert.match(ui, /offHeading:d\.offHeading===''\?'':Number\(d\.offHeading\)/);
+  assert.match(server, /off_heading:\{type:\['number','null'\]\}/);
+  assert.match(server, /off_heading_direction:\{type:\['string','null'\],enum:\['L','R',null\]\}/);
 });
 
 test('snapshot writes use optimistic concurrency and reject stale device copies', () => {
@@ -551,11 +563,12 @@ test('XLSX ZIP archive is preflighted before decompression', () => {
   assert.ok(server.includes('validateXlsxZip(bytes);'));
 });
 
-test('AI import preview validates row limits, dates, numeric and boolean fields before merging', () => {
+test('AI import preview validates row limits, dates, numeric and off-heading angle fields before merging', () => {
   assert.match(ui, /edited\.jumps\.length>10000/);
   assert.match(ui, /invalid date/);
   assert.match(ui, /non-numeric/);
-  assert.match(ui, /invalid .* value/);
+  assert.match(ui, /invalid Off Heading angle/);
+  assert.match(ui, /offHeadingDirection/);
   assert.match(ui, /A maximum of 10,000 jumps/);
 });
 
@@ -584,7 +597,8 @@ test('AI logbook import uses bounded ExcelJS parsing and extracts searchable PDF
 test('jump form validates unique positive numbering, numeric values, date, time and GPS coordinates', () => {
   assert.match(ui, /Number\.isInteger\(jumpNumber\).*jump number must be a positive whole number/i);
   assert.match(ui, /db\.jumps\.some\(x=>x\.id!==j\.id&&Number\(x\.number\)===jumpNumber\)/);
-  assert.match(ui, /Height',d\.height/);
+  assert.doesNotMatch(ui, /\['Height',d\.height\]/);
+  assert.match(ui, /field\('Height','height',[\s\S]*?'text'\)/);
   assert.match(ui, /Delay for SU',d\.delaySu/);
   assert.match(ui, /validateCoordinates\(d\.latitude,d\.longitude\)/);
   assert.match(ui, /valid time in 24-hour format/);
