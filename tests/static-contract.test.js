@@ -868,10 +868,10 @@ test('native FlySight discovery scan stops after a bounded interval and can be c
 
  
 test('iPhone personal-use installation instructions explain free Safari home-screen app and BLE limitation', () => {
-  assert.match(publicHtml, /Install on your iPhone · Free/);
-  assert.match(publicHtml, /Add to Home Screen/);
-  assert.match(publicHtml, /manual TRACK\.CSV \/ SENSOR\.CSV import/);
-  assert.match(publicHtml, /Direct Bluetooth connection to FlySight 2 requires the separate native iOS app/);
+  assert.match(ui, /Install on your iPhone · Free/);
+  assert.match(ui, /Add to Home Screen/);
+  assert.match(ui, /manual TRACK\.CSV \/ SENSOR\.CSV import/);
+  assert.match(ui, /Direct Bluetooth connection to FlySight 2 requires the separate native iOS app/);
 });
 
 test('FlySight BLE writes respect CoreBluetooth backpressure and preserve queued frame order', () => {
