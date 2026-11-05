@@ -467,6 +467,14 @@ test('FlySight handoff uploads lock and revalidate the token row before enforcin
   assert.match(server, /if\(!lockedSession\.rowCount\)[\s\S]*Handoff token is invalid or expired/);
 });
 
+test('FlySight checksum failures commit chunk cleanup so a corrected upload can be retried', () => {
+  const start=server.indexOf("app.post('/api/flysight/handoffs/upload'");
+  const end=server.indexOf("app.get('/api/flysight/handoffs', requireUser",start);
+  const handler=server.slice(start,end);
+  assert.match(handler, /if\(actual!==v\.sha256\.toLowerCase\(\)\)\{[\s\S]*DELETE FROM flysight_handoff_chunks[\s\S]*COMMIT[\s\S]*Retry the upload/);
+  assert.doesNotMatch(handler, /DELETE FROM flysight_handoff_chunks[^;]*;await client\.query\('ROLLBACK'\)/);
+});
+
 test('native FlySight uploader pins HTTPS handoff tokens to the trusted logbook origin', () => {
   assert.match(nativeFlySight, /scheme\?\.lowercased\(\) == "https"/);
   assert.match(nativeFlySight, /host\?\.lowercased\(\) == "base-jump-logbook\.vercel\.app"/);
