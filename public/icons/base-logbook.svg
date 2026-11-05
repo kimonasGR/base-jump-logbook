@@ -1,5 +1,36 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <rect width="512" height="512" rx="112" fill="#101116"/>
-  <path d="M256 74v364M98 165l316 182M98 347l316-182M164 112l92 144 92-144M164 400l92-144 92 144M112 256h288" fill="none" stroke="#8fb3ff" stroke-width="24" stroke-linecap="round" stroke-linejoin="round"/>
-  <circle cx="256" cy="256" r="28" fill="#f5f6fb"/>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#05080e"/>
+      <stop offset=".58" stop-color="#101c2d"/>
+      <stop offset="1" stop-color="#07111d"/>
+    </linearGradient>
+    <linearGradient id="mountain" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#78c6f2"/>
+      <stop offset="1" stop-color="#174d78"/>
+    </linearGradient>
+    <clipPath id="round"><rect width="512" height="512" rx="112"/></clipPath>
+  </defs>
+  <g clip-path="url(#round)">
+    <rect width="512" height="512" fill="url(#bg)"/>
+    <path d="M168 99C247 28 386 52 457 186" fill="none" stroke="#ff790d" stroke-width="13" stroke-linecap="round"/>
+    <path d="M-16 321 77 285 118 307 165 258 207 291 256 235 301 287 350 251 405 294 528 257V540H-16Z" fill="url(#mountain)"/>
+    <path d="m-12 337 88-34 41 22 47-49 44 31 48-54 45 48 48-32 56 40 83-34" fill="none" stroke="#a6dcfa" stroke-width="7" opacity=".7"/>
+    <path d="M0 232 0 252 36 260 46 290 65 296 79 278 94 273 103 288 119 283 131 266 149 258 164 269 178 255 190 241 176 229 158 231 141 244 122 236 103 242 85 227 64 234 43 223 22 229Z" fill="#f4f7fb"/>
+    <path d="M138 173c19-14 41-24 64-28 13-2 26 2 36 10l13 10-11 13-22-7-24 8-26 18-22 3-17-11Z" fill="#f7f8fb"/>
+    <circle cx="254" cy="151" r="20" fill="#f7f8fb"/>
+    <path d="m237 164-34-9-37-20-33-7-8 7 27 17 35 18 38 13 21-5 19-14-9-9Z" fill="#f7f8fb"/>
+    <path d="m265 162 36 7 36-3 19-10 8 6-18 19-43 10-39-5-20-12Z" fill="#f7f8fb"/>
+    <path d="m239 174-19 27-35 20-20 2-5-9 23-14 17-22 15-14Z" fill="#f7f8fb"/>
+    <path d="m268 174 20 22 31 14 19-1 6-8-24-12-22-23-17-7Z" fill="#f7f8fb"/>
+    <path d="M248 181 229 205l-20 27 19 7 35-26 22-27-15-12Z" fill="#f7f8fb"/>
+    <path d="M249 181 270 204l23 23-15 9-34-23-19-25 12-12Z" fill="#f7f8fb"/>
+    <path d="M217 207 196 225l-20 5-8-8 18-16 18-12Z" fill="#f7f8fb"/>
+    <path d="M284 206 306 224l22 6 8-8-20-16-20-12Z" fill="#f7f8fb"/>
+    <path d="M244 127c-17-12-32-17-47-17" fill="none" stroke="#f7f8fb" stroke-width="5" stroke-linecap="round"/>
+    <path d="M264 128c15-12 30-16 46-15" fill="none" stroke="#f7f8fb" stroke-width="5" stroke-linecap="round"/>
+    <text x="300" y="333" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="67" font-weight="900" font-style="italic" letter-spacing="-4" fill="#fff">BASE</text>
+    <text x="302" y="391" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="61" font-weight="900" font-style="italic" letter-spacing="-2" fill="#ff790d">JUMP</text>
+    <text x="302" y="422" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="19" font-weight="700" letter-spacing="8" fill="#f5f7fb">LOGBOOK</text>
+  </g>
 </svg>
