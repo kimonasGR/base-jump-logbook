@@ -18,7 +18,7 @@
 
 <main id="main"></main>
 </div>
-<nav class="bottom" aria-label="Main navigation"><button type="button" class="active" data-view="logbook" aria-label="Logbook"><strong>▤</strong><span>Logbook</span></button><button type="button" data-view="analytics" aria-label="Stats"><strong>▥</strong><span>Stats</span></button><button type="button" data-view="objects" aria-label="Objects"><strong>⌖</strong><span>Objects</span></button><button type="button" data-view="gear" aria-label="Gear"><strong>♧</strong><span>Gear</span></button><button type="button" data-view="settings" aria-label="Settings"><strong>⚙</strong><span>Settings</span></button></nav>
+<nav class="bottom" aria-label="Main navigation" style="display:none"><button type="button" class="active" data-view="logbook" aria-label="Logbook"><strong>▤</strong><span>Logbook</span></button><button type="button" data-view="analytics" aria-label="Stats"><strong>▥</strong><span>Stats</span></button><button type="button" data-view="objects" aria-label="Objects"><strong>⌖</strong><span>Objects</span></button><button type="button" data-view="gear" aria-label="Gear"><strong>♧</strong><span>Gear</span></button><button type="button" data-view="settings" aria-label="Settings"><strong>⚙</strong><span>Settings</span></button></nav>
 <script>
 const KEY='baseLogbookMvp.v1';
 const defaults={jumps:[],objects:[],gears:[],options:{'Slider Configuration':['Slider up','Slider down','Slider off','Slick terminal'],'Pilot Chute':['42 inch','36 inch','38 inch'],'Suit':['Wingsuit','Track suit','No suit'],'Rig':[],'Canopy':[],'Jump Type':['Standard','Wingsuit','Tracking','Tandem','Other'],'Exit manoeuvre':['Stable','Front flip','Back flip','Other'],'Deployment Method':['Stowed','Hand-held','PCA','Static line','Direct bag'],'Wind strength':['Calm','Light','Moderate','Strong']},settings:{heightUnit:'m',windUnit:'m/s',timeZone:'local'}};
@@ -311,7 +311,7 @@ window.createLocalRecoveryBackup=()=>{const key='baseLogbookRecoveryBackups.v1';
 window.exportLocalRecoveryBackup=()=>{const raw=localStorage.getItem('baseLogbookRecoveryBackups.v1');if(!raw)throw Error('No recovery backup exists on this device.');download('base-logbook-recovery-backups.json',raw,'application/json')};
 window.setCloudSnapshot=x=>{if(!x||!Array.isArray(x.jumps)||!Array.isArray(x.objects)||!Array.isArray(x.gears))throw Error('Invalid cloud snapshot');const localMedia=new Map(db.jumps.map(j=>[j.id,j.media||[]]));db={...structuredClone(defaults),...x,settings:{...defaults.settings,...(x.settings||{})},jumps:x.jumps.map(j=>{const local=localMedia.get(j.id)||[],remote=j.media||[];return {...j,media:[...remote.map(m=>({...local.find(l=>l.storageId===m.storageId),...m})),...local.filter(m=>!m.storageId)]}})};persist();render()};
 </script>
-<div id="authGate" style="position:fixed;inset:0;background:#101116f5;z-index:20;display:flex;align-items:center;justify-content:center;padding:20px">
+<div id="authGate" style="position:fixed;inset:0;background:#101116f5;z-index:2000;display:flex;align-items:center;justify-content:center;padding:20px">
   <section class="section" style="width:min(100%,420px);padding:22px">
     <div class="eyebrow">PRIVATE CLOUD ACCOUNT</div><h1 style="font-size:24px;margin:5px 0 8px">Your BASE logbook</h1>
     <p class="muted small">Sign in to keep your jumps private and synchronized across devices.</p>
@@ -494,16 +494,18 @@ window.cloudSync=()=>{if(cloudReady)syncCloud()};
 // Retry a locally saved snapshot after connectivity returns or the app is reopened.
 window.addEventListener('online',()=>{if(syncRetryTimer){clearTimeout(syncRetryTimer);syncRetryTimer=null}if(cloudReady)syncCloud()});
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&cloudReady){if(syncRetryTimer){clearTimeout(syncRetryTimer);syncRetryTimer=null}syncCloud()}});
-window.signOutLogbook=async()=>{try{await auth.signOut();cloudReady=false;cloudConflict=false;syncAgain=false;bearer=null;cloudUpdatedAt=null;if(syncRetryTimer){clearTimeout(syncRetryTimer);syncRetryTimer=null}syncRetryAttempt=0;gate.style.display='flex';status.textContent='Signed out';errorBox.textContent='';}catch(e){showError(e)}};
+window.signOutLogbook=async()=>{try{await auth.signOut();cloudReady=false;cloudConflict=false;syncAgain=false;bearer=null;cloudUpdatedAt=null;if(syncRetryTimer){clearTimeout(syncRetryTimer);syncRetryTimer=null}syncRetryAttempt=0;gate.style.display='flex';document.querySelector('.bottom').style.display='none';status.textContent='Signed out';errorBox.textContent='';}catch(e){showError(e)}};
 function enterOfflineMode(){
   cloudReady=false;cloudConflict=false;bearer=null;cloudUpdatedAt=null;
   gate.style.display='none';
+  document.querySelector('.bottom').style.display='none';
   status.textContent='Offline mode · records stay on this device until secure cloud sync is available.';
   render();
 }
 function showAuthUnavailable(){
   cloudReady=false;cloudConflict=false;bearer=null;
   gate.style.display='flex';
+  document.querySelector('.bottom').style.display='none';
   status.textContent='Sign in required · secure cloud connection unavailable';
   showError('Secure sign-in could not load. Check your connection and reload this page. Your local records have not been changed.');
 }
@@ -539,7 +541,7 @@ async function enterApp(){
     const initial=await api('/api/snapshot',{method:'PUT',body:JSON.stringify({...window.getLocalSnapshot(),expectedUpdatedAt:null})});
     cloudUpdatedAt=initial.updatedAt;
   }
-  cloudConflict=false;cloudReady=true;gate.style.display='none';
+  cloudConflict=false;cloudReady=true;gate.style.display='none';document.querySelector('.bottom').style.display='grid';
   const email=session.data?.user?.email||session.user?.email||'Signed in';
   status.textContent='Cloud sync active · '+email;
 }
