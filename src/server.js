@@ -242,6 +242,7 @@ function validateXlsxZip(bytes) {
   if(offset!==directoryOffset+directorySize) throw new Error('Invalid XLSX archive directory size');
 }
 app.post('/api/logbook/import-analyze', requireUser, asyncRoute(async (req,res) => {
+  let deterministicDraft=null;
   const fileName=String(req.body?.fileName||'logbook').slice(0,160);
   const ext=fileName.toLowerCase().split('.').pop();
   const binary=typeof req.body?.fileBase64==='string'?req.body.fileBase64:'';
@@ -265,6 +266,100 @@ app.post('/api/logbook/import-analyze', requireUser, asyncRoute(async (req,res) 
         // the canonical logbook sheet so AI import never doubles the jumps.
         const canonicalSheet=workbook.worksheets.find(sheet=>String(sheet.name).trim().toLowerCase()==='base logbook');
         const sheetsToImport=canonicalSheet?[canonicalSheet]:workbook.worksheets;
+        // A structured Google Forms BASE Logbook export has a fixed schema.
+        // Map it deterministically: no AI/API call and no inferred units.
+        if(canonicalSheet) {
+          const headerRow=canonicalSheet.getRow(1);
+          const headers=headerRow.values.slice(1).map(v=>String(v??'').trim());
+          const col=Object.fromEntries(headers.map((h,i)=>[h,i+1]));
+          const required=['Jump Number','Date','Object name or location','Country','Type'];
+          if(required.every(h=>col[h])) {
+            const cellText=(row,name)=>{
+              const v=row.getCell(col[name]).value;
+              if(v==null)return '';
+              if(v instanceof Date)return v.toISOString();
+              if(typeof v==='object'&&'text' in v)return String(v.text??'').trim();
+              if(typeof v==='object'&&'result' in v)return String(v.result??'').trim();
+              return String(v).trim();
+            };
+            const numberOrNull=value=>{
+              if(value==null||value==='')return null;
+              const match=String(value).replace(',','.').match(/-?\d+(?:\.\d+)?/);
+              return match?Number(match[0]):null;
+            };
+            const dateOnly=value=>{
+              if(value instanceof Date)return value.toISOString().slice(0,10);
+              const s=String(value??'').trim();
+              if(!s)return null;
+              const iso=s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+              if(iso)return iso[1]+'-'+iso[2].padStart(2,'0')+'-'+iso[3].padStart(2,'0');
+              const d=new Date(s);
+              return Number.isNaN(d.getTime())?null:d.toISOString().slice(0,10);
+            };
+            const jumps=[];
+            const warnings=[];
+            const typeMap={building:'B',antenna:'A',span:'S',earth:'E'};
+            for(let ri=2;ri<=canonicalSheet.rowCount;ri++){
+              const row=canonicalSheet.getRow(ri);
+              const raw=Object.fromEntries(headers.map(h=>[h,cellText(row,h)]));
+              if(!Object.values(raw).some(Boolean))continue;
+              const jumpNumber=numberOrNull(raw['Jump Number']);
+              const date=dateOnly(row.getCell(col['Date']).value??raw['Date']);
+              if(jumpNumber==null||date==null){
+                warnings.push('Row '+ri+' skipped: missing or unreadable Jump Number/Date.');
+                continue;
+              }
+              const originalType=raw['Type'];
+              const normalizedType=typeMap[String(originalType).trim().toLowerCase()];
+              const objectType=normalizedType||'Other';
+              const offRaw=raw['Off Heading?'];
+              const offMatch=offRaw.match(/^\s*(\d+(?:[.,]\d+)?)\s*°?\s*([LR])?\s*$/i);
+              const correctionRaw=raw['Correction?'];
+              const notes=[];
+              if(raw['Comments'])notes.push('Comments: '+raw['Comments']);
+              if(correctionRaw)notes.push('Correction (source): '+correctionRaw+' [preserved as source text; not converted to a boolean].');
+              if(offRaw&&!offMatch)notes.push('Off Heading (source): '+offRaw+' [not converted because it is not a numeric angle].');
+              if(raw['Wind'])notes.push('Wind (source scale 1–5; unit not specified): '+raw['Wind']);
+              const country=raw['Country'];
+              if(/summit\s*\(2012\)/i.test(country)){
+                warnings.push('Row '+ri+' / jump '+jumpNumber+': Country contains a value resembling rig information ("'+country+'"). Preserved unchanged; manual review required.');
+              }
+              const height=raw['Height']||null;
+              const jump={
+                number:jumpNumber, objectName:raw['Object name or location']||null,
+                country:country||null, date, time:null,
+                height, heightUnit:null,
+                objectType, otherType:normalizedType?null:(originalType||'Unknown source type'),
+                sliderConfiguration:raw['Slider Configuration']||null,
+                pilotChute:raw['Pilot Chute']||null, suit:raw['Suit']||null,
+                summitOsp:raw['Summit + OSP ?']||null, rig:raw['Rig']||null,
+                jumpType:raw['Jump Type']||null,
+                windStrength:null, windDirection:null,
+                delay:numberOrNull(raw['Delay']), delaySu:numberOrNull(raw['Delay for SU']),
+                exitManoeuvre:raw['Exit manoeuvre']||null,
+                offHeading:offMatch?Number(offMatch[1].replace(',','.')):null,
+                offHeadingDirection:offMatch?.[2]?.toUpperCase()||null,
+                correction:null, brakeSetting:raw['Brake Setting']||null,
+                privateNotes:notes.join('\n')||null,
+                beautifulPeople:raw['Beauiful people around']||null,
+                uncertainFields:[...(height&&!/\d/.test(height)?['height']:[])]
+              };
+              jumps.push(jump);
+            }
+            deterministicDraft={
+              jumps,
+              mappingSummary:[
+                'Jump Number → number; Date → date; Object name or location → objectName; Country → country.',
+                'Type → objectType: Building/B, Antenna/A, Span/S, Earth/E; other source types are retained as Other + otherType.',
+                'Height is preserved verbatim; no unit is assumed. Delay and Delay for SU are parsed as numbers only.',
+                'Off Heading is mapped only for numeric angles with optional L/R. Other values and Correction? are preserved in privateNotes.',
+                'Wind is preserved in notes as an ordinal 1–5 scale; no unit or measurement is assumed.',
+                'Comments and Beautiful people around are preserved.'
+              ],
+              warnings
+            };
+          }
+        }
         for(const sheet of sheetsToImport) {
           if(sheet.rowCount>20000||sheet.columnCount>200)throw new Error('Workbook dimensions exceed import limits');
           const rows=[];
@@ -292,6 +387,7 @@ app.post('/api/logbook/import-analyze', requireUser, asyncRoute(async (req,res) 
   }
   if (!content.trim() && !scannedPdfBase64) return res.status(400).json({error:'The selected file is empty or unreadable.'});
   if (Buffer.byteLength(content,'utf8')>600000) return res.status(413).json({error:'Extracted text is larger than 600 KB. Split the logbook into smaller files.'});
+  if (deterministicDraft) return res.json({draft:deterministicDraft,requiresConfirmation:true,storedFile:false,directImport:true});
   if (ext==='json') {
     let draft;
     try { draft=JSON.parse(content); } catch { return res.status(422).json({error:'The JSON import file is not valid JSON.'}); }
