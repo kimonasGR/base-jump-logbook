@@ -260,7 +260,12 @@ app.post('/api/logbook/import-analyze', requireUser, asyncRoute(async (req,res) 
         if(workbook.worksheets.length>30)throw new Error('Workbook has too many sheets');
         let totalCells=0;
         const sheets=[];
-        for(const sheet of workbook.worksheets) {
+        // Google Forms exports may contain both "Form Responses 1" and a
+        // curated "Base Logbook" sheet with the exact same records. Prefer
+        // the canonical logbook sheet so AI import never doubles the jumps.
+        const canonicalSheet=workbook.worksheets.find(sheet=>String(sheet.name).trim().toLowerCase()==='base logbook');
+        const sheetsToImport=canonicalSheet?[canonicalSheet]:workbook.worksheets;
+        for(const sheet of sheetsToImport) {
           if(sheet.rowCount>20000||sheet.columnCount>200)throw new Error('Workbook dimensions exceed import limits');
           const rows=[];
           sheet.eachRow({includeEmpty:false},row=>{
