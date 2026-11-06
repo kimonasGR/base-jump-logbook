@@ -28,6 +28,8 @@ app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
 app.use(cors({ origin: process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(',').map(s => s.trim()) : false, credentials: true }));
 app.use(express.json({ limit: '12mb' }));
 
+const asyncRoute = fn => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
+
 // Same-origin Neon Auth proxy. Preserve the browser Origin for Neon Auth's
 // trusted-origin / CSRF checks, while making session cookies first-party to
 // the installed iOS PWA. Never rewrite an untrusted Origin into an allowed one.
@@ -78,7 +80,6 @@ app.use('/auth', asyncRoute(async (req, res) => {
 }));
 
 
-const asyncRoute = fn => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 
 async function requireUser(req, res, next) {
   try {
