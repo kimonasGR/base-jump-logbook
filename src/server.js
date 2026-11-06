@@ -72,7 +72,7 @@ app.use('/auth', asyncRoute(async (req, res) => {
   for (const cookie of cookies) {
     // Drop only the upstream Domain attribute; keep Secure, HttpOnly,
     // SameSite and expiry attributes intact as host-only first-party cookies.
-    res.append('Set-Cookie', cookie.replace(/;\\s*Domain=[^;]*/ig, ''));
+    res.append('Set-Cookie', cookie.split(';').filter(part => !/^\\s*Domain=/i.test(part.trim())).join(';'));
   }
   if (req.method === 'HEAD' || upstream.status === 204 || upstream.status === 304) return res.end();
   const payload = Buffer.from(await upstream.arrayBuffer());
