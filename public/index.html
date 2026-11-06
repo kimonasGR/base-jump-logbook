@@ -559,7 +559,7 @@ submit.onclick=async()=>{
     if(result?.error)throw Error(result.error.message||'Authentication failed.');
     await enterApp();
     const firstFile=document.getElementById('firstLoginLogbook')?.files?.[0]||pendingLogbookFile;
-    if(firstFile){pendingLogbookFile=null;try{await startAiLogbookImport(firstFile,status)}catch(importError){showError(importError)}}
+    if(firstFile){pendingLogbookFile=null;status.textContent='AI import: preparing '+firstFile.name+'…';try{await startAiLogbookImport(firstFile,status)}catch(importError){const message='Logbook import failed: '+(importError?.message||String(importError));status.textContent=message;console.error(message,importError);alert(message)}}
   }catch(e){showError(e)}finally{submit.disabled=false}
 };
 document.getElementById('firstLoginLogbook').onchange=e=>{pendingLogbookFile=e.target.files?.[0]||null};
