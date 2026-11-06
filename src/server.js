@@ -28,6 +28,56 @@ app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
 app.use(cors({ origin: process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(',').map(s => s.trim()) : false, credentials: true }));
 app.use(express.json({ limit: '12mb' }));
 
+// Same-origin Neon Auth proxy. Preserve the browser Origin for Neon Auth's
+// trusted-origin / CSRF checks, while making session cookies first-party to
+// the installed iOS PWA. Never rewrite an untrusted Origin into an allowed one.
+const neonAuthUpstream = 'https://ep-young-truth-badvxgct.neonauth.c-8.eu-central-1.aws.neon.tech/neondb/auth';
+const appOrigin = 'https://base-jump-logbook.vercel.app';
+app.use('/auth', asyncRoute(async (req, res) => {
+  const origin = req.get('origin');
+  if (origin && origin !== appOrigin) {
+    return res.status(403).json({ error: 'Untrusted application origin.' });
+  }
+  if (!origin && !['GET', 'HEAD', 'OPTIONS'].includes(req.method)) {
+    return res.status(403).json({ error: 'Missing application origin.' });
+  }
+  if (req.method === 'OPTIONS') return res.status(204).end();
+
+  const suffix = req.originalUrl.slice('/auth'.length) || '/';
+  const target = neonAuthUpstream + suffix;
+  const headers = new Headers();
+  for (const name of ['accept', 'content-type', 'cookie', 'user-agent', 'x-requested-with', 'x-forwarded-for']) {
+    const value = req.get(name);
+    if (value) headers.set(name, value);
+  }
+  if (origin) headers.set('origin', origin);
+  const referer = req.get('referer');
+  if (referer) headers.set('referer', referer);
+
+  const body = ['GET', 'HEAD'].includes(req.method) ? undefined
+    : req.body === undefined ? undefined : JSON.stringify(req.body);
+  const upstream = await fetch(target, { method: req.method, headers, body, redirect: 'manual' });
+  res.status(upstream.status);
+  for (const name of ['content-type', 'cache-control', 'retry-after', 'www-authenticate']) {
+    const value = upstream.headers.get(name);
+    if (value) res.set(name, value);
+  }
+  const location = upstream.headers.get('location');
+  if (location) res.set('location', location.replace(neonAuthUpstream, '/auth'));
+  const cookies = typeof upstream.headers.getSetCookie === 'function'
+    ? upstream.headers.getSetCookie()
+    : (upstream.headers.get('set-cookie') ? [upstream.headers.get('set-cookie')] : []);
+  for (const cookie of cookies) {
+    // Drop only the upstream Domain attribute; keep Secure, HttpOnly,
+    // SameSite and expiry attributes intact as host-only first-party cookies.
+    res.append('Set-Cookie', cookie.replace(/;\\s*Domain=[^;]*/ig, ''));
+  }
+  if (req.method === 'HEAD' || upstream.status === 204 || upstream.status === 304) return res.end();
+  const payload = Buffer.from(await upstream.arrayBuffer());
+  return res.send(payload);
+}));
+
+
 const asyncRoute = fn => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 
 async function requireUser(req, res, next) {
