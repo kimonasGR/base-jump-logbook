@@ -264,18 +264,21 @@ app.post('/api/logbook/import-analyze', requireUser, asyncRoute(async (req,res) 
         // Google Forms exports may contain both "Form Responses 1" and a
         // curated "Base Logbook" sheet with the exact same records. Prefer
         // the canonical logbook sheet so AI import never doubles the jumps.
-        const canonicalSheet=workbook.worksheets.find(sheet=>String(sheet.name).trim().toLowerCase()==='base logbook');
+        const normalizeHeader=value=>String(value??'').normalize('NFKC').toLowerCase().replace(/[?？]/g,'').replace(/[^\\p{L}\\p{N}]+/gu,' ').trim();
+        const canonicalSheet=workbook.worksheets.find(sheet=>normalizeHeader(sheet.name)==='base logbook')
+          ||workbook.worksheets.find(sheet=>{const hs=sheet.getRow(1).values.slice(1).map(normalizeHeader);return ['date','object name or location','country','type'].every(h=>hs.includes(h));});
         const sheetsToImport=canonicalSheet?[canonicalSheet]:workbook.worksheets;
         // A structured Google Forms BASE Logbook export has a fixed schema.
         // Map it deterministically: no AI/API call and no inferred units.
         if(canonicalSheet) {
           const headerRow=canonicalSheet.getRow(1);
           const headers=headerRow.values.slice(1).map(v=>String(v??'').trim());
-          const col=Object.fromEntries(headers.map((h,i)=>[h,i+1]));
-          const required=['Jump Number','Date','Object name or location','Country','Type'];
-          if(required.every(h=>col[h])) {
+          const col=Object.fromEntries(headers.map((h,i)=>[normalizeHeader(h),i+1]));
+          const getCol=name=>col[normalizeHeader(name)];
+          const required=['Date','Object name or location','Country','Type'];
+          if(required.every(h=>getCol(h))) {
             const cellText=(row,name)=>{
-              const v=row.getCell(col[name]).value;
+              const v=row.getCell(getCol(name)).value;
               if(v==null)return '';
               if(v instanceof Date)return v.toISOString();
               if(typeof v==='object'&&'text' in v)return String(v.text??'').trim();
@@ -305,8 +308,8 @@ app.post('/api/logbook/import-analyze', requireUser, asyncRoute(async (req,res) 
               if(!Object.values(raw).some(Boolean))continue;
               const jumpNumber=numberOrNull(raw['Jump Number']);
               const date=dateOnly(row.getCell(col['Date']).value??raw['Date']);
-              if(jumpNumber==null||date==null){
-                warnings.push('Row '+ri+' skipped: missing or unreadable Jump Number/Date.');
+              if(date==null){
+                warnings.push('Row '+ri+' skipped: missing or unreadable Date.');
                 continue;
               }
               const originalType=raw['Type'];
@@ -326,7 +329,7 @@ app.post('/api/logbook/import-analyze', requireUser, asyncRoute(async (req,res) 
               }
               const height=raw['Height']||null;
               const jump={
-                number:jumpNumber, objectName:raw['Object name or location']||null,
+                number:null, objectName:raw['Object name or location']||null,
                 country:country||null, date, time:null,
                 height, heightUnit:null,
                 objectType, otherType:normalizedType?null:(originalType||'Unknown source type'),
