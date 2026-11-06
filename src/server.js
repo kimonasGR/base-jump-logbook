@@ -317,8 +317,6 @@ app.post('/api/logbook/import-analyze', requireUser, asyncRoute(async (req,res) 
               const correctionRaw=raw['Correction?'];
               const notes=[];
               if(raw['Comments'])notes.push('Comments: '+raw['Comments']);
-              if(raw['Packjob Rating'])notes.push('Packjob Rating (source): '+raw['Packjob Rating']);
-              if(raw['Χρονική σήμανση'])notes.push('Google Forms timestamp (source): '+raw['Χρονική σήμανση']);
               if(correctionRaw)notes.push('Correction (source): '+correctionRaw+' [preserved as source text; not converted to a boolean].');
               if(offRaw&&!offMatch)notes.push('Off Heading (source): '+offRaw+' [not converted because it is not a numeric angle].');
               if(raw['Wind'])notes.push('Wind (source scale 1–5; unit not specified): '+raw['Wind']);
@@ -356,7 +354,7 @@ app.post('/api/logbook/import-analyze', requireUser, asyncRoute(async (req,res) 
                 'Height is preserved verbatim; no unit is assumed. Delay and Delay for SU are parsed as numbers only.',
                 'Off Heading is mapped only for numeric angles with optional L/R. Other values and Correction? are preserved in privateNotes.',
                 'Wind is preserved in notes as an ordinal 1–5 scale; no unit or measurement is assumed.',
-                'Comments, Packjob Rating, Google Forms timestamp and Beautiful people around are preserved.'
+                'Comments and Beautiful people around are preserved.'
               ],
               warnings
             };
