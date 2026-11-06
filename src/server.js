@@ -37,10 +37,14 @@ const neonAuthUpstream = 'https://ep-young-truth-badvxgct.neonauth.c-8.eu-centra
 const appOrigin = 'https://base-jump-logbook.vercel.app';
 app.use('/auth', asyncRoute(async (req, res) => {
   const origin = req.get('origin');
+  const authPath = req.originalUrl.split('?')[0];
+  console.info('Neon Auth proxy request', { method: req.method, path: authPath, origin: origin || null, host: req.get('host') || null, userAgent: req.get('user-agent') || null });
   if (origin && origin !== appOrigin) {
+    console.warn('Neon Auth proxy rejected origin', { path: authPath, origin });
     return res.status(403).json({ error: 'Untrusted application origin.' });
   }
   if (!origin && !['GET', 'HEAD', 'OPTIONS'].includes(req.method)) {
+    console.warn('Neon Auth proxy missing origin', { path: authPath, method: req.method });
     return res.status(403).json({ error: 'Missing application origin.' });
   }
   if (req.method === 'OPTIONS') return res.status(204).end();
@@ -59,6 +63,7 @@ app.use('/auth', asyncRoute(async (req, res) => {
   const body = ['GET', 'HEAD'].includes(req.method) ? undefined
     : req.body === undefined ? undefined : JSON.stringify(req.body);
   const upstream = await fetch(target, { method: req.method, headers, body, redirect: 'manual' });
+  console.info('Neon Auth proxy response', { method: req.method, path: authPath, status: upstream.status });
   res.status(upstream.status);
   for (const name of ['content-type', 'cache-control', 'retry-after', 'www-authenticate']) {
     const value = upstream.headers.get(name);
