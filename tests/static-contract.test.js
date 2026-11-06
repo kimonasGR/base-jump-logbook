@@ -916,3 +916,10 @@ test('FlySight BLE writes respect CoreBluetooth backpressure and preserve queued
   assert.match(nativeFlySightBLE, /pendingBLEWrites\.removeAll\(keepingCapacity: false\)/);
   assert.equal(nativeFlySightBLE.split('type: .withoutResponse').length - 1, 2);
 });
+
+test('Settings is opened from the original bottom navigation only', () => {
+  assert.match(ui, /<nav class="bottom">[\s\S]*data-view="settings"[\s\S]*<\/nav>/);
+  assert.doesNotMatch(ui, /id="settingsTop"/);
+  assert.match(ui, /function bindView\(\)\{const nav=document\.querySelector\('\.bottom'\);if\(nav\)nav\.onclick=e=>\{/);
+  assert.match(ui, /const nextView=button\.dataset\.view;[\s\S]*view=nextView;[\s\S]*render\(\)/);
+});
