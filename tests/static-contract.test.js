@@ -928,9 +928,9 @@ test('FlySight BLE writes respect CoreBluetooth backpressure and preserve queued
   assert.equal(nativeFlySightBLE.split('type: .withoutResponse').length - 1, 2);
 });
 
-test('Settings is opened from the original bottom navigation only', () => {
-  assert.match(ui, /<nav class="bottom">[\s\S]*data-view="settings"[\s\S]*<\/nav>/);
-  assert.doesNotMatch(ui, /id="settingsTop"/);
-  assert.match(ui, /function bindView\(\)\{const nav=document\.querySelector\('\.bottom'\);if\(nav\)nav\.onclick=e=>\{/);
-  assert.match(ui, /const nextView=button\.dataset\.view;[\s\S]*view=nextView;[\s\S]*render\(\)/);
+test('Settings navigation binds each bottom button directly for reliable mobile taps', () => {
+  assert.match(ui, /document\.querySelectorAll\('\.bottom button\[data-view\]'\)\.forEach\(button=>\{/);
+  assert.match(ui, /button\.type='button';button\.onclick=\(\)=>\{/);
+  assert.match(ui, /view=nextView;editing=objectEditing=gearEditing=null;render\(\)/);
+  assert.doesNotMatch(ui, /nav\.onclick=e=>/);
 });
