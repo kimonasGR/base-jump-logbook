@@ -348,9 +348,14 @@ const gate=document.getElementById('authGate'), errorBox=document.getElementById
 let creating=false, cloudReady=false, cloudConflict=false, syncBusy=false, syncAgain=false, bearer=null, cloudUpdatedAt=null, syncRetryTimer=null, syncRetryAttempt=0;
 function showError(e){errorBox.textContent=e?.message||String(e)||'Authentication failed.'}
 async function getToken(){
-  const token=await neonAuth.getJWTToken();
-  if(!token)throw Error('Could not obtain a secure access token. Please sign in again.');
-  return token;
+  // Neon Auth's Better Auth JWT plugin exposes the signed application JWT at /token.
+  // The SDK helper in the pinned CDN build calls /get-jwt-token, which this service
+  // does not expose; use the documented endpoint and keep the cookie session in-browser.
+  const response=await fetch(AUTH_URL+'/token',{method:'GET',credentials:'include',headers:{'Accept':'application/json'}});
+  const data=await response.json().catch(()=>({}));
+  if(!response.ok)throw Error(data.message||data.error||'Could not obtain a secure access token ('+response.status+'). Please sign in again.');
+  if(typeof data.token!=='string'||!data.token)throw Error('The authentication service did not return a valid access token. Please sign in again.');
+  return data.token;
 }
 window.extractVoiceAudio=async(blob)=>{if(!bearer)throw Error('Not signed in.');const form=new FormData();form.append('audio',blob,'jump-audio.webm');const response=await fetch('/api/voice/extract',{method:'POST',headers:{Authorization:'Bearer '+bearer},body:form});const data=await response.json().catch(()=>({}));if(!response.ok)throw Error(data.error||'Voice extraction failed ('+response.status+').');return data};
 let pendingLogbookFile=null;
