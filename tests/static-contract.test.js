@@ -934,3 +934,12 @@ test('Settings navigation binds each bottom button directly for reliable mobile 
   assert.match(ui, /view=nextView;editing=objectEditing=gearEditing=null;render\(\)/);
   assert.doesNotMatch(ui, /nav\.onclick=e=>/);
 });
+
+
+test('logbook import requires and preserves original jump numbers without renumbering', () => {
+  assert.match(ui, /Jump Number is required and will be preserved exactly/);
+  assert.match(ui, /must have its original positive whole-number Jump Number/);
+  assert.match(ui, /number:Number\(j\.number\)/);
+  assert.match(ui, /already exists in the logbook or is duplicated in this import/);
+  assert.doesNotMatch(ui, /number:j\.number!==''&&j\.number!==undefined\?j\.number:\+\+nextNumber/);
+});
