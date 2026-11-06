@@ -20,6 +20,8 @@
 </div>
 <nav class="bottom" aria-label="Main navigation" style="display:none"><button type="button" class="active" data-view="logbook" aria-label="Logbook"><strong>▤</strong><span>Logbook</span></button><button type="button" data-view="analytics" aria-label="Stats"><strong>▥</strong><span>Stats</span></button><button type="button" data-view="objects" aria-label="Objects"><strong>⌖</strong><span>Objects</span></button><button type="button" data-view="gear" aria-label="Gear"><strong>♧</strong><span>Gear</span></button><button type="button" data-view="settings" aria-label="Settings"><strong>⚙</strong><span>Settings</span></button></nav>
 <script>
+// Keep the cloud-conflict flag available to both classic scripts and ES modules.
+window.cloudConflict = window.cloudConflict ?? false;
 const KEY='baseLogbookMvp.v1';
 const defaults={jumps:[],objects:[],gears:[],options:{'Slider Configuration':['Slider up','Slider down','Slider off','Slick terminal'],'Pilot Chute':['42 inch','36 inch','38 inch'],'Suit':['Wingsuit','Track suit','No suit'],'Rig':[],'Canopy':[],'Jump Type':['Standard','Wingsuit','Tracking','Tandem','Other'],'Exit manoeuvre':['Stable','Front flip','Back flip','Other'],'Deployment Method':['Stowed','Hand-held','PCA','Static line','Direct bag'],'Wind strength':['Calm','Light','Moderate','Strong']},settings:{heightUnit:'m',windUnit:'m/s',timeZone:'local'}};
 let db=load(),view='logbook',editing=null,objectEditing=null,gearEditing=null,query='',filterCountry='',filterType='',filterSuit='',mediaDraft=[],trackDraft=null;
