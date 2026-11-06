@@ -330,12 +330,14 @@ const AUTH_URL='https://ep-young-truth-badvxgct.neonauth.c-8.eu-central-1.aws.ne
 let neonAuth=null;
 try {
   const authModule=await import('https://esm.sh/@neondatabase/auth');
-  neonAuth=authModule.createInternalNeonAuth(AUTH_URL);
+  // Use the public browser client factory. createInternalNeonAuth is an SDK-internal
+  // factory intended for NeonClient integrations, not direct browser app usage.
+  neonAuth=authModule.createAuthClient(AUTH_URL);
 } catch(error) {
   // The app shell must remain usable when the CDN is unreachable offline.
   console.info('Neon Auth SDK unavailable; starting in local-only mode.',error);
 }
-const auth=neonAuth?.adapter||null;
+const auth=neonAuth||null;
 const gate=document.getElementById('authGate'), errorBox=document.getElementById('authError'), submit=document.getElementById('authSubmit'), toggle=document.getElementById('authToggle'), status=document.getElementById('authStatus');
 let creating=false, cloudReady=false, cloudConflict=false, syncBusy=false, syncAgain=false, bearer=null, cloudUpdatedAt=null, syncRetryTimer=null, syncRetryAttempt=0;
 function showError(e){errorBox.textContent=e?.message||String(e)||'Authentication failed.'}
