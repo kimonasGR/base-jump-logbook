@@ -519,16 +519,16 @@ test('web logbook can create a handoff token and load verified uploaded chunks i
 });
 
 
-test('Settings is reachable from the header and mobile bottom navigation', () => {
+test('Settings is reachable from the original mobile bottom navigation only', () => {
   assert.match(ui, /<nav class="bottom">/);
   assert.doesNotMatch(ui, /<div class="tabs" id="tabs">/);
-  assert.match(ui, /<button class="iconbtn" id="settingsTop"/);
-  assert.match(ui, /settingsTop\.onclick=\(\)=>\{view='settings'/);
+  assert.doesNotMatch(ui, /id="settingsTop"/);
   assert.match(ui, /\.bottom button\{flex:1;min-width:0/);
   assert.match(ui, /data-view="logbook"/);
   assert.match(ui, /data-view="objects"/);
   assert.match(ui, /data-view="gear"/);
   assert.match(ui, /data-view="settings"/);
+  assert.match(ui, /function bindView\(\)\{const nav=document\.querySelector\('\.bottom'\);if\(nav\)nav\.onclick=e=>\{/);
 });
 
 test('jump media helper text describes private cloud upload rather than local-only prototype storage', () => {
