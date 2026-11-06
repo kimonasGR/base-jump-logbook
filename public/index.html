@@ -326,16 +326,22 @@ window.setCloudSnapshot=x=>{if(!x||!Array.isArray(x.jumps)||!Array.isArray(x.obj
   </section>
 </div>
 <script type="module">
-const AUTH_URL='/auth';
+const AUTH_URL=new URL('/auth',window.location.origin).toString();
 let neonAuth=null;
-try {
-  const authModule=await import('https://esm.sh/@neondatabase/auth');
-  // Use the public browser client factory. createInternalNeonAuth is an SDK-internal
-  // factory intended for NeonClient integrations, not direct browser app usage.
-  neonAuth=authModule.createAuthClient(AUTH_URL);
-} catch(error) {
-  // The app shell must remain usable when the CDN is unreachable offline.
-  console.info('Neon Auth SDK unavailable; starting in local-only mode.',error);
+let authLoadError=null;
+for (const moduleUrl of [
+  'https://esm.sh/@neondatabase/auth@0.6.0-beta?bundle',
+  'https://cdn.jsdelivr.net/npm/@neondatabase/auth@0.6.0-beta/+esm'
+]) {
+  try {
+    const authModule=await import(moduleUrl);
+    if (typeof authModule.createAuthClient !== 'function') throw new Error('Neon Auth browser client factory is unavailable.');
+    neonAuth=authModule.createAuthClient(AUTH_URL);
+    break;
+  } catch(error) {
+    authLoadError=error;
+    console.warn('Neon Auth SDK source unavailable:',moduleUrl,error);
+  }
 }
 const auth=neonAuth||null;
 const gate=document.getElementById('authGate'), errorBox=document.getElementById('authError'), submit=document.getElementById('authSubmit'), toggle=document.getElementById('authToggle'), status=document.getElementById('authStatus');
@@ -491,8 +497,14 @@ function enterOfflineMode(){
   status.textContent='Offline mode · records stay on this device until secure cloud sync is available.';
   render();
 }
+function showAuthUnavailable(){
+  cloudReady=false;cloudConflict=false;bearer=null;
+  gate.style.display='flex';
+  status.textContent='Sign in required · secure cloud connection unavailable';
+  showError('Secure sign-in could not load. Check your connection and reload this page. Your local records have not been changed.');
+}
 async function enterApp(){
-  if(!auth){enterOfflineMode();return}
+  if(!auth){showAuthUnavailable();return}
   let session;
   try{session=await auth.getSession()}catch(error){if(navigator.onLine===false){enterOfflineMode();return}throw error}
   if(!session?.data?.user&&!session?.user){if(navigator.onLine===false){enterOfflineMode();return}throw Error('No active session.')}
